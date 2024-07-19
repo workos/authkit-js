@@ -22,6 +22,8 @@ interface RedirectOptions {
   state?: any;
 }
 
+type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
+
 const DEFAULT_HOSTNAME = "api.workos.com";
 
 export async function createClient(
@@ -52,22 +54,26 @@ export async function createClient(
     port ? `:${port}` : ""
   }`;
   const _useCookie = !devMode;
+  let _authkitClientState: State = "INITIAL";
 
   const _needsRefresh = () => {
-    const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
-      | string
-      | undefined;
-    const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
-      | number
-      | undefined;
+    if (_authkitClientState === "AUTHENTICATED") {
+      const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
+        | string
+        | undefined;
+      const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
+        | number
+        | undefined;
 
-    if (!accessToken || !expiresAt) {
-      return true;
+      if (!accessToken || !expiresAt) {
+        return true;
+      }
+
+      // TODO: is this configurable?
+      const LEEWAY = 10 * 1000; // 10 seconds
+      return expiresAt < Date.now() - LEEWAY;
     }
-
-    // TODO: is this configurable?
-    const LEEWAY = 10 * 1000; // 10 seconds
-    return expiresAt < Date.now() - LEEWAY;
+    return false;
   };
 
   async function signIn(opts: Omit<RedirectOptions, "type"> = {}) {
@@ -124,6 +130,11 @@ export async function createClient(
   };
 
   async function _initialize() {
+    console.log("HELLO THIS IS THE LINKED VERSION");
+    if (_authkitClientState !== "INITIAL") {
+      return;
+    }
+
     const searchParams = new URLSearchParams(window.location.search);
     if (isRedirectCallback(redirectUri, searchParams)) {
       await _handleCallback();
@@ -139,10 +150,15 @@ export async function createClient(
   }
 
   async function _handleCallback() {
+    if (_authkitClientState !== "INITIAL") {
+      return;
+    }
+
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
     const state = stateParam ? JSON.parse(stateParam) : undefined;
+    _authkitClientState = "AUTHENTICATING";
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
@@ -160,11 +176,12 @@ export async function createClient(
         });
 
         if (authenticationResponse) {
-          // TODO: fire callback here??
+          _authkitClientState = "AUTHENTICATED";
           setSessionData(authenticationResponse, { devMode });
           onRedirectCallback({ state, ...authenticationResponse });
         }
       } catch (error) {
+        _authkitClientState = "ERROR";
         console.error(error);
       }
     }
@@ -179,13 +196,19 @@ export async function createClient(
   const REFRESH_LOCK = "WORKOS_REFRESH_SESSION";
 
   async function refreshSession() {
+    if (
+      _authkitClientState !== "AUTHENTICATED" &&
+      _authkitClientState !== "INITIAL"
+    ) {
+      return;
+    }
+
     console.debug("refreshing...");
     const lock = new Lock();
 
-    if (await lock.acquireLock(REFRESH_LOCK)) {
-      // TODO: add a check here to NOT keep trying to refresh if refreshing has
-      // already failed and we haven't re-authed
-      try {
+    try {
+      _authkitClientState = "AUTHENTICATING";
+      if (await lock.acquireLock(REFRESH_LOCK)) {
         const authenticationResponse = await authenticateWithRefreshToken({
           baseUrl: _baseUrl,
           clientId: _clientId,
@@ -194,18 +217,22 @@ export async function createClient(
         });
 
         if (authenticationResponse) {
+          _authkitClientState = "AUTHENTICATED";
           setSessionData(authenticationResponse, { devMode });
         }
-      } catch (error: unknown) {
-        console.error(error);
-        if (error instanceof RefreshError) {
-          // TODO: fire a session ended callback?
-          removeSessionData({ devMode });
-        } 
-        throw error;
-      } finally {
-        await lock.releaseLock(REFRESH_LOCK);
       }
+    } catch (error: unknown) {
+      console.error(error);
+      if (error instanceof RefreshError) {
+        // TODO: fire a session ended callback?
+        removeSessionData({ devMode });
+      }
+      // TODO: if a lock couldn't be acquired... that's not a fatal error.
+      // maybe that's another state?
+      _authkitClientState = "ERROR";
+      throw error;
+    } finally {
+      await lock.releaseLock(REFRESH_LOCK);
     }
   }
 

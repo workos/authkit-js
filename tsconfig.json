@@ -5,6 +5,7 @@
     "module": "commonjs",
     "outDir": "./dist",
     "esModuleInterop": true,
+    // "esModuleInterop": false,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true
