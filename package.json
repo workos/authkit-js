@@ -1,6 +1,6 @@
 {
   "name": "@workos-inc/authkit-js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "AuthKit SDK",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -28,8 +28,5 @@
     "ts-node": "^10.9.2",
     "tsup": "^8.1.2",
     "typescript": "^5.5.3"
-  },
-  "dependencies": {
-    "browser-tabs-lock": "^1.3.0"
   }
 }
