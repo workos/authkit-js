@@ -14,7 +14,7 @@ import {
 } from "./utils";
 import { getRefreshToken } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
-import Lock from "browser-tabs-lock";
+import Lock from "./vendor/browser-tabs-lock";
 import { RefreshError } from "./utils/authenticate-with-refresh-token";
 
 interface RedirectOptions {
