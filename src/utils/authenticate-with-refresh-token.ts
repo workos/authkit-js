@@ -5,13 +5,19 @@ interface AuthenticateWithRefreshTokenOptions {
   baseUrl: string;
   clientId: string;
   refreshToken: string | undefined;
+  organizationId?: string;
   useCookie: boolean;
 }
 
-export class RefreshError extends Error {}
+export class RefreshError extends Error { }
 
-export async function authenticateWithRefreshToken(options: AuthenticateWithRefreshTokenOptions) {
-  const { baseUrl, clientId, refreshToken, useCookie } = options;
+export async function authenticateWithRefreshToken({
+  baseUrl,
+  clientId,
+  refreshToken,
+  organizationId,
+  useCookie
+}: AuthenticateWithRefreshTokenOptions) {
   const response = await fetch(`${baseUrl}/user_management/authenticate`, {
     method: 'POST',
     ...(useCookie && { credentials: 'include' }),
@@ -23,6 +29,7 @@ export async function authenticateWithRefreshToken(options: AuthenticateWithRefr
       client_id: clientId,
       grant_type: 'refresh_token',
       ...(!useCookie && { refresh_token: refreshToken }),
+      organization_id: organizationId,
     }),
   });
 

@@ -12,7 +12,7 @@ import {
   removeSessionData,
   storageKeys,
 } from "./utils";
-import { getRefreshToken } from "./utils/session-data";
+import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
 import Lock from "./vendor/browser-tabs-lock";
 import { RefreshError } from "./utils/authenticate-with-refresh-token";
@@ -40,19 +40,18 @@ export async function createClient(
     port,
     redirectUri = window.origin,
     devMode = location.hostname === "localhost" ||
-      location.hostname === "127.0.0.1",
+    location.hostname === "127.0.0.1",
     // refresh if this is true
     onBeforeAutoRefresh = () => {
       return true;
     },
-    onRedirectCallback = (_: RedirectParams) => {},
+    onRedirectCallback = (_: RedirectParams) => { },
   } = options;
 
   const _clientId = clientId;
   const _redirectUri = redirectUri;
-  const _baseUrl = `${https ? "https" : "http"}://${apiHostname}${
-    port ? `:${port}` : ""
-  }`;
+  const _baseUrl = `${https ? "https" : "http"}://${apiHostname}${port ? `:${port}` : ""
+    }`;
   const _useCookie = !devMode;
   let _authkitClientState: State = "INITIAL";
 
@@ -105,12 +104,17 @@ export async function createClient(
     return user ? (user as User) : null;
   }
 
+  function _getAccessToken() {
+    return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
+  }
+
   async function getAccessToken() {
     // TODO: should this respect onBeforeAutoRefresh ?
     if (_needsRefresh()) {
       await refreshSession();
     }
-    return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
+
+    return _getAccessToken();
   }
 
   let _refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -193,7 +197,9 @@ export async function createClient(
 
   const REFRESH_LOCK = "WORKOS_REFRESH_SESSION";
 
-  async function refreshSession() {
+  async function refreshSession(
+    { organizationId }: { organizationId?: string } = {}
+  ) {
     if (
       _authkitClientState !== "AUTHENTICATED" &&
       _authkitClientState !== "INITIAL"
@@ -204,11 +210,20 @@ export async function createClient(
     const lock = new Lock();
     try {
       _authkitClientState = "AUTHENTICATING";
+
+      if (!organizationId) {
+        const accessToken = _getAccessToken();
+        if (accessToken) {
+          organizationId = getClaims(accessToken)?.org_id;
+        }
+      }
+
       if (await lock.acquireLock(REFRESH_LOCK)) {
         const authenticationResponse = await authenticateWithRefreshToken({
           baseUrl: _baseUrl,
           clientId: _clientId,
           refreshToken: getRefreshToken({ devMode }),
+          organizationId,
           useCookie: _useCookie,
         });
 
