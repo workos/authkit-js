@@ -40,18 +40,19 @@ export async function createClient(
     port,
     redirectUri = window.origin,
     devMode = location.hostname === "localhost" ||
-    location.hostname === "127.0.0.1",
+      location.hostname === "127.0.0.1",
     // refresh if this is true
     onBeforeAutoRefresh = () => {
       return true;
     },
-    onRedirectCallback = (_: RedirectParams) => { },
+    onRedirectCallback = (_: RedirectParams) => {},
   } = options;
 
   const _clientId = clientId;
   const _redirectUri = redirectUri;
-  const _baseUrl = `${https ? "https" : "http"}://${apiHostname}${port ? `:${port}` : ""
-    }`;
+  const _baseUrl = `${https ? "https" : "http"}://${apiHostname}${
+    port ? `:${port}` : ""
+  }`;
   const _useCookie = !devMode;
   let _authkitClientState: State = "INITIAL";
 

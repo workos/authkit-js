@@ -9,7 +9,7 @@ interface AuthenticateWithRefreshTokenOptions {
   useCookie: boolean;
 }
 
-export class RefreshError extends Error { }
+export class RefreshError extends Error {}
 
 export async function authenticateWithRefreshToken({
   baseUrl,
