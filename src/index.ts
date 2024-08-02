@@ -1,2 +1,2 @@
 export { createClient } from './create-client';
-export { User } from './interfaces';
+export { User, AuthenticationResponse } from './interfaces';
