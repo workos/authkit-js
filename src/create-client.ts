@@ -163,24 +163,30 @@ export async function createClient(
       storageKeys.codeVerifier
     );
 
-    if (code && codeVerifier) {
-      try {
-        const authenticationResponse = await authenticateWithCode({
-          baseUrl: _baseUrl,
-          clientId: _clientId,
-          code,
-          codeVerifier,
-          useCookie: _useCookie,
-        });
+    if (code) {
+      if (codeVerifier) {
+        try {
+          const authenticationResponse = await authenticateWithCode({
+            baseUrl: _baseUrl,
+            clientId: _clientId,
+            code,
+            codeVerifier,
+            useCookie: _useCookie,
+          });
 
-        if (authenticationResponse) {
-          _authkitClientState = "AUTHENTICATED";
-          setSessionData(authenticationResponse, { devMode });
-          onRedirectCallback({ state, ...authenticationResponse });
+          if (authenticationResponse) {
+            _authkitClientState = "AUTHENTICATED";
+            setSessionData(authenticationResponse, { devMode });
+            onRedirectCallback({ state, ...authenticationResponse });
+          }
+        } catch (error) {
+          _authkitClientState = "ERROR";
+          console.error(error);
         }
-      } catch (error) {
+      }
+      else {
         _authkitClientState = "ERROR";
-        console.error(error);
+        console.error("Received code but missing codeVerifier");
       }
     }
 
