@@ -8,6 +8,7 @@ export interface GetAuthorizationUrlOptions {
 	redirectUri?: string;
 	state?: string;
 	screenHint?: 'sign-up' | 'sign-in';
+  invitationToken?: string;
 	codeChallenge?: string;
 	codeChallengeMethod?: string;
 }
