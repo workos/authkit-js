@@ -1,1 +1,1 @@
-export { NoClientIdProvidedException } from './no-client-id-provided.exception';
+export { NoClientIdProvidedException } from "./no-client-id-provided.exception";

@@ -1,48 +1,50 @@
-import { GetAuthorizationUrlOptions } from '../interfaces';
-import { toQueryString } from './to-query-string';
+import { GetAuthorizationUrlOptions } from "../interfaces";
+import { toQueryString } from "./to-query-string";
 
 export function getAuthorizationUrl(
-	baseUrl: string,
-	{
-		clientId,
-		connectionId,
-		domainHint,
-		loginHint,
-		organizationId,
-		provider = 'authkit',
-		redirectUri,
-		state,
-		screenHint,
+  baseUrl: string,
+  {
+    clientId,
+    connectionId,
+    domainHint,
+    loginHint,
+    organizationId,
+    provider = "authkit",
+    redirectUri,
+    state,
+    screenHint,
     invitationToken,
-		codeChallenge,
-		codeChallengeMethod,
-	}: GetAuthorizationUrlOptions,
+    codeChallenge,
+    codeChallengeMethod,
+  }: GetAuthorizationUrlOptions,
 ): string {
-	if (!provider && !connectionId && !organizationId) {
-		throw new TypeError(
-			`Incomplete arguments. Need to specify either a 'connectionId', 'organizationId', or 'provider'.`,
-		);
-	}
+  if (!provider && !connectionId && !organizationId) {
+    throw new TypeError(
+      `Incomplete arguments. Need to specify either a 'connectionId', 'organizationId', or 'provider'.`,
+    );
+  }
 
-	if (provider !== 'authkit' && screenHint) {
-		throw new TypeError(`'screenHint' is only supported for 'authkit' provider`);
-	}
+  if (provider !== "authkit" && screenHint) {
+    throw new TypeError(
+      `'screenHint' is only supported for 'authkit' provider`,
+    );
+  }
 
-	const query = toQueryString({
-		connection_id: connectionId,
-		organization_id: organizationId,
-		domain_hint: domainHint,
-		login_hint: loginHint,
-		provider,
-		client_id: clientId,
-		redirect_uri: redirectUri,
-		response_type: 'code',
-		state,
-		screen_hint: screenHint,
+  const query = toQueryString({
+    connection_id: connectionId,
+    organization_id: organizationId,
+    domain_hint: domainHint,
+    login_hint: loginHint,
+    provider,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    state,
+    screen_hint: screenHint,
     invitation_token: invitationToken,
-		code_challenge: codeChallenge,
-		code_challenge_method: codeChallengeMethod,
-	});
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallengeMethod,
+  });
 
-	return `${baseUrl}/user_management/authorize?${query}`;
+  return `${baseUrl}/user_management/authorize?${query}`;
 }

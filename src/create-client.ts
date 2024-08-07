@@ -29,7 +29,7 @@ const DEFAULT_HOSTNAME = "api.workos.com";
 
 export async function createClient(
   clientId: string,
-  options: CreateClientOptions = {}
+  options: CreateClientOptions = {},
 ) {
   if (!clientId) {
     throw new NoClientIdProvidedException();
@@ -163,7 +163,7 @@ export async function createClient(
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
-      storageKeys.codeVerifier
+      storageKeys.codeVerifier,
     );
 
     if (code) {
