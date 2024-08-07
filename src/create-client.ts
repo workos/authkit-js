@@ -27,6 +27,8 @@ type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
 
 const DEFAULT_HOSTNAME = "api.workos.com";
 
+const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
+
 export async function createClient(
   clientId: string,
   options: CreateClientOptions = {}
@@ -220,10 +222,14 @@ export async function createClient(
     try {
       _authkitClientState = "AUTHENTICATING";
 
-      if (!organizationId) {
+      if (organizationId) {
+        sessionStorage.setItem(ORGANIZATION_ID_SESSION_STORAGE_KEY, organizationId);
+      } else {
         const accessToken = _getAccessToken();
         if (accessToken) {
           organizationId = getClaims(accessToken)?.org_id;
+        } else {
+          organizationId = sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ?? undefined;
         }
       }
 
