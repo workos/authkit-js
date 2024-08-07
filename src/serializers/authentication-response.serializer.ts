@@ -1,17 +1,27 @@
-import { AuthenticationResponse, AuthenticationResponseRaw } from '../interfaces';
-import { deserializeUser } from './user.serializer';
+import {
+  AuthenticationResponse,
+  AuthenticationResponseRaw,
+} from "../interfaces";
+import { deserializeUser } from "./user.serializer";
 
 export const deserializeAuthenticationResponse = (
-	authenticationResponse: AuthenticationResponseRaw,
+  authenticationResponse: AuthenticationResponseRaw,
 ): AuthenticationResponse => {
-	const { user, organization_id, access_token, refresh_token, impersonator, ...rest } = authenticationResponse;
+  const {
+    user,
+    organization_id,
+    access_token,
+    refresh_token,
+    impersonator,
+    ...rest
+  } = authenticationResponse;
 
-	return {
-		user: deserializeUser(user),
-		organizationId: organization_id,
-		accessToken: access_token,
-		refreshToken: refresh_token,
-		impersonator,
-		...rest,
-	};
+  return {
+    user: deserializeUser(user),
+    organizationId: organization_id,
+    accessToken: access_token,
+    refreshToken: refresh_token,
+    impersonator,
+    ...rest,
+  };
 };
