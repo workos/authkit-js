@@ -1,18 +1,18 @@
-import { User, UserRaw } from './user.interface';
-import { Impersonator, ImpersonatorRaw } from './impersonator.interface';
+import { User, UserRaw } from "./user.interface";
+import { Impersonator, ImpersonatorRaw } from "./impersonator.interface";
 
 export interface AuthenticationResponse {
-	user: User;
-	accessToken: string;
-	refreshToken: string;
-	organizationId?: string;
-	impersonator?: Impersonator;
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  organizationId?: string;
+  impersonator?: Impersonator;
 }
 
 export interface AuthenticationResponseRaw {
-	user: UserRaw;
-	access_token: string;
-	refresh_token: string;
-	organization_id?: string;
-	impersonator?: ImpersonatorRaw;
+  user: UserRaw;
+  access_token: string;
+  refresh_token: string;
+  organization_id?: string;
+  impersonator?: ImpersonatorRaw;
 }

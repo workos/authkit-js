@@ -1,5 +1,5 @@
-import { AuthenticationResponseRaw } from '../interfaces';
-import { deserializeAuthenticationResponse } from '../serializers';
+import { AuthenticationResponseRaw } from "../interfaces";
+import { deserializeAuthenticationResponse } from "../serializers";
 
 interface AuthenticateWithRefreshTokenOptions {
   baseUrl: string;
@@ -16,18 +16,18 @@ export async function authenticateWithRefreshToken({
   clientId,
   refreshToken,
   organizationId,
-  useCookie
+  useCookie,
 }: AuthenticateWithRefreshTokenOptions) {
   const response = await fetch(`${baseUrl}/user_management/authenticate`, {
-    method: 'POST',
-    ...(useCookie && { credentials: 'include' }),
+    method: "POST",
+    ...(useCookie && { credentials: "include" }),
     headers: {
-      'Accept': 'application/json, text/plain, */*',
-      'Content-Type': 'application/json',
+      Accept: "application/json, text/plain, */*",
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       client_id: clientId,
-      grant_type: 'refresh_token',
+      grant_type: "refresh_token",
       ...(!useCookie && { refresh_token: refreshToken }),
       organization_id: organizationId,
     }),
@@ -37,7 +37,7 @@ export async function authenticateWithRefreshToken({
     const data = (await response.json()) as AuthenticationResponseRaw;
     return deserializeAuthenticationResponse(data);
   } else {
-    const error = await response.json() as any;
+    const error = (await response.json()) as any;
     throw new RefreshError(error.error_description);
   }
 }

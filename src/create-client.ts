@@ -31,7 +31,7 @@ const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 export async function createClient(
   clientId: string,
-  options: CreateClientOptions = {}
+  options: CreateClientOptions = {},
 ) {
   if (!clientId) {
     throw new NoClientIdProvidedException();
@@ -170,7 +170,7 @@ export async function createClient(
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
-      storageKeys.codeVerifier
+      storageKeys.codeVerifier,
     );
 
     if (code) {

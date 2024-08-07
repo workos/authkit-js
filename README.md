@@ -1,7 +1,7 @@
 # AuthKit JavaScript Library
 
 This library can be used to interface with AuthKit in a client-side JavaScript
-application. 
+application.
 
 ## Installation
 
