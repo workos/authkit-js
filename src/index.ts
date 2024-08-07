@@ -1,2 +1,3 @@
 export { createClient } from './create-client';
-export { User } from './interfaces';
+export { getClaims } from './utils/session-data';
+export { User, AuthenticationResponse } from './interfaces';

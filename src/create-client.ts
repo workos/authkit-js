@@ -46,6 +46,7 @@ export async function createClient(
       return true;
     },
     onRedirectCallback = (_: RedirectParams) => {},
+    onRefresh: _onRefresh,
   } = options;
 
   const _clientId = clientId;
@@ -221,6 +222,7 @@ export async function createClient(
         if (authenticationResponse) {
           _authkitClientState = "AUTHENTICATED";
           setSessionData(authenticationResponse, { devMode });
+          _onRefresh && _onRefresh(authenticationResponse);
         }
       }
     } catch (error: unknown) {
