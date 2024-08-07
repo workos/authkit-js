@@ -8,6 +8,7 @@ export interface CreateClientOptions {
   devMode?: boolean;
   onRedirectCallback?: (_: RedirectParams) => void;
   onBeforeAutoRefresh?: () => boolean;
+  onRefresh?: (_: AuthenticationResponse) => void;
 }
 
 export interface RedirectParams extends AuthenticationResponse {

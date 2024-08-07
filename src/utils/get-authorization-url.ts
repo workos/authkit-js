@@ -13,6 +13,7 @@ export function getAuthorizationUrl(
 		redirectUri,
 		state,
 		screenHint,
+    invitationToken,
 		codeChallenge,
 		codeChallengeMethod,
 	}: GetAuthorizationUrlOptions,
@@ -38,6 +39,7 @@ export function getAuthorizationUrl(
 		response_type: 'code',
 		state,
 		screen_hint: screenHint,
+    invitation_token: invitationToken,
 		code_challenge: codeChallenge,
 		code_challenge_method: codeChallengeMethod,
 	});

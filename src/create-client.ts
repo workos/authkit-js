@@ -20,6 +20,7 @@ import { RefreshError } from "./utils/authenticate-with-refresh-token";
 interface RedirectOptions {
   type: "sign-in" | "sign-up";
   state?: any;
+  invitationToken?: string;
 }
 
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
@@ -46,6 +47,7 @@ export async function createClient(
       return true;
     },
     onRedirectCallback = (_: RedirectParams) => {},
+    onRefresh: _onRefresh,
   } = options;
 
   const _clientId = clientId;
@@ -84,7 +86,7 @@ export async function createClient(
     return _redirect({ ...opts, type: "sign-up" });
   }
 
-  async function _redirect({ type, state }: RedirectOptions) {
+  async function _redirect({ type, state, invitationToken }: RedirectOptions) {
     const { codeVerifier, codeChallenge } = await createPkceChallenge();
     // store the code verifier in session storage for later use (after the redirect back from authkit)
     window.sessionStorage.setItem(storageKeys.codeVerifier, codeVerifier);
@@ -94,6 +96,7 @@ export async function createClient(
       screenHint: type,
       codeChallenge,
       codeChallengeMethod: "S256",
+      invitationToken,
       state: state ? JSON.stringify(state) : undefined,
     });
 
@@ -168,24 +171,29 @@ export async function createClient(
       storageKeys.codeVerifier
     );
 
-    if (code && codeVerifier) {
-      try {
-        const authenticationResponse = await authenticateWithCode({
-          baseUrl: _baseUrl,
-          clientId: _clientId,
-          code,
-          codeVerifier,
-          useCookie: _useCookie,
-        });
+    if (code) {
+      if (codeVerifier) {
+        try {
+          const authenticationResponse = await authenticateWithCode({
+            baseUrl: _baseUrl,
+            clientId: _clientId,
+            code,
+            codeVerifier,
+            useCookie: _useCookie,
+          });
 
-        if (authenticationResponse) {
-          _authkitClientState = "AUTHENTICATED";
-          setSessionData(authenticationResponse, { devMode });
-          onRedirectCallback({ state, ...authenticationResponse });
+          if (authenticationResponse) {
+            _authkitClientState = "AUTHENTICATED";
+            setSessionData(authenticationResponse, { devMode });
+            onRedirectCallback({ state, ...authenticationResponse });
+          }
+        } catch (error) {
+          _authkitClientState = "ERROR";
+          console.error(error);
         }
-      } catch (error) {
+      } else {
         _authkitClientState = "ERROR";
-        console.error(error);
+        console.error("Received code but missing codeVerifier");
       }
     }
 
@@ -231,6 +239,7 @@ export async function createClient(
         if (authenticationResponse) {
           _authkitClientState = "AUTHENTICATED";
           setSessionData(authenticationResponse, { devMode });
+          _onRefresh && _onRefresh(authenticationResponse);
         }
       }
     } catch (error: unknown) {

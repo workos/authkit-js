@@ -11,6 +11,7 @@ interface AccessToken {
   sub: string;
   org_id?: string;
   role?: string;
+  permissions?: string[];
 }
 
 // should replace this with jose if we ever need to verify the JWT
