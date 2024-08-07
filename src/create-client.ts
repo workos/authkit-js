@@ -208,9 +208,9 @@ export async function createClient(
 
   const REFRESH_LOCK = "WORKOS_REFRESH_SESSION";
 
-  async function refreshSession(
-    { organizationId }: { organizationId?: string } = {}
-  ) {
+  async function refreshSession({
+    organizationId,
+  }: { organizationId?: string } = {}) {
     if (
       _authkitClientState !== "AUTHENTICATED" &&
       _authkitClientState !== "INITIAL"
@@ -223,13 +223,18 @@ export async function createClient(
       _authkitClientState = "AUTHENTICATING";
 
       if (organizationId) {
-        sessionStorage.setItem(ORGANIZATION_ID_SESSION_STORAGE_KEY, organizationId);
+        sessionStorage.setItem(
+          ORGANIZATION_ID_SESSION_STORAGE_KEY,
+          organizationId,
+        );
       } else {
         const accessToken = _getAccessToken();
         if (accessToken) {
           organizationId = getClaims(accessToken)?.org_id;
         } else {
-          organizationId = sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ?? undefined;
+          organizationId =
+            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ??
+            undefined;
         }
       }
 
