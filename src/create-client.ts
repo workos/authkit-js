@@ -230,23 +230,23 @@ export async function createClient(
     try {
       _authkitClientState = "AUTHENTICATING";
 
-      if (organizationId) {
-        sessionStorage.setItem(
-          ORGANIZATION_ID_SESSION_STORAGE_KEY,
-          organizationId,
-        );
-      } else {
-        const accessToken = _getAccessToken();
-        if (accessToken) {
-          organizationId = getClaims(accessToken)?.org_id;
-        } else {
-          organizationId =
-            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ??
-            undefined;
-        }
-      }
-
       if (await lock.acquireLock(REFRESH_LOCK)) {
+        if (organizationId) {
+          sessionStorage.setItem(
+            ORGANIZATION_ID_SESSION_STORAGE_KEY,
+            organizationId,
+          );
+        } else {
+          const accessToken = _getAccessToken();
+          if (accessToken) {
+            organizationId = getClaims(accessToken)?.org_id;
+          } else {
+            organizationId =
+              sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ??
+              undefined;
+          }
+        }
+
         const authenticationResponse = await authenticateWithRefreshToken({
           baseUrl: _baseUrl,
           clientId: _clientId,
