@@ -21,6 +21,7 @@ interface RedirectOptions {
   type: "sign-in" | "sign-up";
   state?: any;
   invitationToken?: string;
+  passwordResetToken?: string;
 }
 
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
@@ -88,7 +89,12 @@ export async function createClient(
     return _redirect({ ...opts, type: "sign-up" });
   }
 
-  async function _redirect({ type, state, invitationToken }: RedirectOptions) {
+  async function _redirect({
+    type,
+    state,
+    invitationToken,
+    passwordResetToken,
+  }: RedirectOptions) {
     const { codeVerifier, codeChallenge } = await createPkceChallenge();
     // store the code verifier in session storage for later use (after the redirect back from authkit)
     window.sessionStorage.setItem(storageKeys.codeVerifier, codeVerifier);
@@ -99,6 +105,7 @@ export async function createClient(
       codeChallenge,
       codeChallengeMethod: "S256",
       invitationToken,
+      passwordResetToken,
       state: state ? JSON.stringify(state) : undefined,
     });
 
@@ -187,6 +194,7 @@ export async function createClient(
           if (authenticationResponse) {
             _authkitClientState = "AUTHENTICATED";
             setSessionData(authenticationResponse, { devMode });
+            _onRefresh && _onRefresh(authenticationResponse);
             onRedirectCallback({ state, ...authenticationResponse });
           }
         } catch (error) {
