@@ -193,6 +193,7 @@ export async function createClient(
 
           if (authenticationResponse) {
             _authkitClientState = "AUTHENTICATED";
+            _scheduleAutomaticRefresh();
             setSessionData(authenticationResponse, { devMode });
             _onRefresh && _onRefresh(authenticationResponse);
             onRedirectCallback({ state, ...authenticationResponse });
