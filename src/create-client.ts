@@ -12,7 +12,7 @@ import {
   removeSessionData,
   storageKeys,
 } from "./utils";
-import { getRefreshToken } from "./utils/session-data";
+import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
 import Lock from "./vendor/browser-tabs-lock";
 import { RefreshError } from "./utils/authenticate-with-refresh-token";
@@ -27,6 +27,8 @@ interface RedirectOptions {
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
 
 const DEFAULT_HOSTNAME = "api.workos.com";
+
+const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 export async function createClient(
   clientId: string,
@@ -115,12 +117,17 @@ export async function createClient(
     return user ? (user as User) : null;
   }
 
+  function _getAccessToken() {
+    return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
+  }
+
   async function getAccessToken() {
     // TODO: should this respect onBeforeAutoRefresh ?
     if (_needsRefresh()) {
       await refreshSession();
     }
-    return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
+
+    return _getAccessToken();
   }
 
   let _refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -209,7 +216,9 @@ export async function createClient(
 
   const REFRESH_LOCK = "WORKOS_REFRESH_SESSION";
 
-  async function refreshSession() {
+  async function refreshSession({
+    organizationId,
+  }: { organizationId?: string } = {}) {
     if (
       _authkitClientState !== "AUTHENTICATED" &&
       _authkitClientState !== "INITIAL"
@@ -220,11 +229,29 @@ export async function createClient(
     const lock = new Lock();
     try {
       _authkitClientState = "AUTHENTICATING";
+
       if (await lock.acquireLock(REFRESH_LOCK)) {
+        if (organizationId) {
+          sessionStorage.setItem(
+            ORGANIZATION_ID_SESSION_STORAGE_KEY,
+            organizationId,
+          );
+        } else {
+          const accessToken = _getAccessToken();
+          if (accessToken) {
+            organizationId = getClaims(accessToken)?.org_id;
+          } else {
+            organizationId =
+              sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ??
+              undefined;
+          }
+        }
+
         const authenticationResponse = await authenticateWithRefreshToken({
           baseUrl: _baseUrl,
           clientId: _clientId,
           refreshToken: getRefreshToken({ devMode }),
+          organizationId,
           useCookie: _useCookie,
         });
 
