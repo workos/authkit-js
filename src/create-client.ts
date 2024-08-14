@@ -74,9 +74,10 @@ export async function createClient(
         return true;
       }
 
-      // TODO: is this configurable?
+      // TODO: should LEEWAY be configurable?
       const LEEWAY = 10 * 1000; // 10 seconds
-      return expiresAt < Date.now() - LEEWAY;
+      const refreshTime = expiresAt - LEEWAY;
+      return refreshTime < Date.now();
     }
     return false;
   };
