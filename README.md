@@ -43,7 +43,8 @@ A Promise that resolves to an AuthKitClient object with the following methods:
 ```typescript
 interface CreateClientOptions {
   // Use this to override the default API hostname
-  // This is useful for avoiding problems with agressive firewalls/filters since you can use this to make a proxy to WorkOS' API
+  // This is useful for avoiding problems with agressive firewalls/filters since you can
+  // make your own proxy to WorkOS' API and have the library direct it's requests there.
   // Default: https://api.workos.com
   apiHostname?: string;
   // Use this to override the default HTTPS protocol (best for local development only)
