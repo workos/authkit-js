@@ -51,6 +51,7 @@ export async function createClient(
     },
     onRedirectCallback = (_: RedirectParams) => {},
     onRefresh: _onRefresh,
+    onRefreshFailure: _onRefreshFailure,
   } = options;
 
   const _clientId = clientId;
@@ -168,7 +169,6 @@ export async function createClient(
     if (isRedirectCallback(redirectUri, searchParams)) {
       await _handleCallback();
     } else {
-      // TODO: if  this succeeds kick off the auto refresh timer?
       try {
         await refreshSession();
         _scheduleAutomaticRefresh();
@@ -279,8 +279,8 @@ export async function createClient(
     } catch (error: unknown) {
       console.error(error);
       if (error instanceof RefreshError) {
-        // TODO: fire a session ended callback?
         removeSessionData({ devMode });
+        _onRefreshFailure && _onRefreshFailure({ signIn: signIn });
       }
       // TODO: if a lock couldn't be acquired... that's not a fatal error.
       // maybe that's another state?
