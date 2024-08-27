@@ -15,7 +15,7 @@ import {
 import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
 import Lock from "./vendor/browser-tabs-lock";
-import { RefreshError } from "./utils/authenticate-with-refresh-token";
+import { LoginRequiredError, RefreshError } from "./errors";
 
 interface RedirectOptions {
   type: "sign-in" | "sign-up";
@@ -122,13 +122,22 @@ export async function createClient(
     return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
   }
 
-  async function getAccessToken() {
+  async function getAccessToken(): Promise<string> {
     // TODO: should this respect onBeforeAutoRefresh ?
     if (_needsRefresh()) {
-      await refreshSession();
+      try {
+        await refreshSession();
+      } catch (err) {
+        throw new LoginRequiredError();
+      }
     }
 
-    return _getAccessToken();
+    const accessToken = _getAccessToken();
+    if (!accessToken) {
+      throw new LoginRequiredError();
+    }
+
+    return accessToken;
   }
 
   let _refreshTimer: ReturnType<typeof setTimeout> | undefined;
