@@ -1,4 +1,5 @@
 import { AuthenticationResponse } from "./authentication-response.interface";
+import { createClient } from "../create-client";
 
 export interface CreateClientOptions {
   apiHostname?: string;
@@ -9,6 +10,9 @@ export interface CreateClientOptions {
   onRedirectCallback?: (_: RedirectParams) => void;
   onBeforeAutoRefresh?: () => boolean;
   onRefresh?: (_: AuthenticationResponse) => void;
+  onRefreshFailure?: (args: {
+    signIn: Awaited<ReturnType<typeof createClient>>["signIn"];
+  }) => void;
 }
 
 export interface RedirectParams extends AuthenticationResponse {
