@@ -1,3 +1,4 @@
+import { RefreshError } from "../errors";
 import { AuthenticationResponseRaw } from "../interfaces";
 import { deserializeAuthenticationResponse } from "../serializers";
 
@@ -8,8 +9,6 @@ interface AuthenticateWithRefreshTokenOptions {
   organizationId?: string;
   useCookie: boolean;
 }
-
-export class RefreshError extends Error {}
 
 export async function authenticateWithRefreshToken({
   baseUrl,
