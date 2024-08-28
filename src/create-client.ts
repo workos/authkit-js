@@ -128,7 +128,11 @@ export async function createClient(
       try {
         await refreshSession();
       } catch (err) {
-        throw new LoginRequiredError();
+        if (err instanceof RefreshError) {
+          throw new LoginRequiredError();
+        } else {
+          throw err;
+        }
       }
     }
 
