@@ -276,6 +276,12 @@ export async function createClient(
         _authkitClientState = "AUTHENTICATED";
         setSessionData(authenticationResponse, { devMode });
         _onRefresh && _onRefresh(authenticationResponse);
+      } else {
+        // couldn't acquire lock
+        console.warn("Couldn't acquire refresh lock");
+
+        // preserving the original state so that we can try again next time
+        _authkitClientState = beginningState;
       }
     } catch (error: unknown) {
       console.error(error);
