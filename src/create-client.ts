@@ -63,24 +63,25 @@ export async function createClient(
   let _authkitClientState: State = "INITIAL";
 
   const _needsRefresh = () => {
-    if (_authkitClientState === "AUTHENTICATED") {
-      const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
-        | string
-        | undefined;
-      const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
-        | number
-        | undefined;
-
-      if (!accessToken || !expiresAt) {
-        return true;
-      }
-
-      // TODO: should LEEWAY be configurable?
-      const LEEWAY = 10 * 1000; // 10 seconds
-      const refreshTime = expiresAt - LEEWAY;
-      return refreshTime < Date.now();
+    if (_authkitClientState !== "AUTHENTICATED") {
+      return true;
     }
-    return false;
+
+    const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
+      | string
+      | undefined;
+    const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
+      | number
+      | undefined;
+
+    if (!accessToken || !expiresAt) {
+      return true;
+    }
+
+    // TODO: should LEEWAY be configurable?
+    const LEEWAY = 10 * 1000; // 10 seconds
+    const refreshTime = expiresAt - LEEWAY;
+    return refreshTime < Date.now();
   };
 
   async function signIn(opts: Omit<RedirectOptions, "type"> = {}) {
@@ -272,11 +273,9 @@ export async function createClient(
           useCookie: _useCookie,
         });
 
-        if (authenticationResponse) {
-          _authkitClientState = "AUTHENTICATED";
-          setSessionData(authenticationResponse, { devMode });
-          _onRefresh && _onRefresh(authenticationResponse);
-        }
+        _authkitClientState = "AUTHENTICATED";
+        setSessionData(authenticationResponse, { devMode });
+        _onRefresh && _onRefresh(authenticationResponse);
       }
     } catch (error: unknown) {
       console.error(error);
