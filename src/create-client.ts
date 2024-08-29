@@ -241,6 +241,8 @@ export async function createClient(
       return;
     }
 
+    const beginningState = _authkitClientState;
+
     const lock = new Lock();
     try {
       _authkitClientState = "AUTHENTICATING";
@@ -280,7 +282,12 @@ export async function createClient(
       console.error(error);
       if (error instanceof RefreshError) {
         removeSessionData({ devMode });
-        _onRefreshFailure && _onRefreshFailure({ signIn: signIn });
+        // fire the refresh failure UNLESS this is the initial refresh attempt
+        // (the initial refresh is expected to fail if a user has not logged in
+        // ever or recently)
+        beginningState !== "INITIAL" &&
+          _onRefreshFailure &&
+          _onRefreshFailure({ signIn: signIn });
       }
       // TODO: if a lock couldn't be acquired... that's not a fatal error.
       // maybe that's another state?
