@@ -47,7 +47,7 @@ export async function createClient(
       location.hostname === "127.0.0.1",
     // refresh if this is true
     onBeforeAutoRefresh = () => {
-      return true;
+      return !document.hidden;
     },
     onRedirectCallback = (_: RedirectParams) => {},
     onRefresh: _onRefresh,
@@ -125,7 +125,6 @@ export async function createClient(
   }
 
   async function getAccessToken(): Promise<string> {
-    // TODO: should this respect onBeforeAutoRefresh ?
     if (_needsRefresh()) {
       try {
         await refreshSession();
