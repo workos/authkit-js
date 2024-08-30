@@ -235,13 +235,6 @@ export async function createClient(
   async function refreshSession({
     organizationId,
   }: { organizationId?: string } = {}) {
-    if (
-      _authkitClientState !== "AUTHENTICATED" &&
-      _authkitClientState !== "INITIAL"
-    ) {
-      return;
-    }
-
     const beginningState = _authkitClientState;
 
     const lock = new Lock();
@@ -319,7 +312,6 @@ export async function createClient(
     signUp,
     getUser,
     getAccessToken,
-    refreshSession,
     signOut,
   };
 }
