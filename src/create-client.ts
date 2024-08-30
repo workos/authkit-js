@@ -62,26 +62,30 @@ export async function createClient(
   const _useCookie = !devMode;
   let _authkitClientState: State = "INITIAL";
 
-  const _needsRefresh = () => {
-    if (_authkitClientState !== "AUTHENTICATED") {
-      return true;
+  const _shouldRefresh = () => {
+    switch (_authkitClientState) {
+      case "INITIAL":
+      case "AUTHENTICATING":
+        return true;
+      case "ERROR":
+        return false;
+      case "AUTHENTICATED":
+        const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
+          | string
+          | undefined;
+        const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
+          | number
+          | undefined;
+
+        if (!accessToken || !expiresAt) {
+          return true;
+        }
+
+        // TODO: should LEEWAY be configurable?
+        const LEEWAY = 10 * 1000; // 10 seconds
+        const refreshTime = expiresAt - LEEWAY;
+        return refreshTime < Date.now();
     }
-
-    const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
-      | string
-      | undefined;
-    const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
-      | number
-      | undefined;
-
-    if (!accessToken || !expiresAt) {
-      return true;
-    }
-
-    // TODO: should LEEWAY be configurable?
-    const LEEWAY = 10 * 1000; // 10 seconds
-    const refreshTime = expiresAt - LEEWAY;
-    return refreshTime < Date.now();
   };
 
   async function signIn(opts: Omit<RedirectOptions, "type"> = {}) {
@@ -125,7 +129,7 @@ export async function createClient(
   }
 
   async function getAccessToken(): Promise<string> {
-    if (_needsRefresh()) {
+    if (_shouldRefresh()) {
       try {
         await refreshSession();
       } catch (err) {
@@ -148,7 +152,7 @@ export async function createClient(
   let _refreshTimer: ReturnType<typeof setTimeout> | undefined;
   const _scheduleAutomaticRefresh = () => {
     _refreshTimer = setTimeout(() => {
-      if (_needsRefresh() && onBeforeAutoRefresh()) {
+      if (_shouldRefresh() && onBeforeAutoRefresh()) {
         refreshSession()
           .catch((e) => {
             console.error(e);
