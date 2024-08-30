@@ -172,8 +172,9 @@ export async function createClient(
       try {
         await refreshSession();
         _scheduleAutomaticRefresh();
-      } catch (error) {
-        console.log("error refreshing...", error);
+      } catch {
+        // this is expected to fail if a user doesn't
+        // have a session. do nothing.
       }
     }
   }
