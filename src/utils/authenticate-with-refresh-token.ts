@@ -36,6 +36,8 @@ export async function authenticateWithRefreshToken({
     const data = (await response.json()) as AuthenticationResponseRaw;
     return deserializeAuthenticationResponse(data);
   } else {
+    // TODO: a 500 error should be different than a 400 error (500s should
+    // continue to retry?)
     const error = (await response.json()) as any;
     throw new RefreshError(error.error_description);
   }

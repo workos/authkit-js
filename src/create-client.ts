@@ -47,7 +47,7 @@ export async function createClient(
       location.hostname === "127.0.0.1",
     // refresh if this is true
     onBeforeAutoRefresh = () => {
-      return !document.hidden;
+      return !document.hidden && navigator.onLine
     },
     onRedirectCallback = (_: RedirectParams) => {},
     onRefresh: _onRefresh,
@@ -155,7 +155,7 @@ export async function createClient(
       if (_shouldRefresh() && onBeforeAutoRefresh()) {
         refreshSession()
           .catch((e) => {
-            console.error(e);
+            console.warn(e);
           })
           .then(_scheduleAutomaticRefresh);
       } else {
@@ -175,7 +175,7 @@ export async function createClient(
     } else {
       try {
         await refreshSession();
-        _scheduleAutomaticRefresh();
+        // _scheduleAutomaticRefresh();
       } catch {
         // this is expected to fail if a user doesn't
         // have a session. do nothing.
@@ -212,7 +212,7 @@ export async function createClient(
 
           if (authenticationResponse) {
             _authkitClientState = "AUTHENTICATED";
-            _scheduleAutomaticRefresh();
+            // _scheduleAutomaticRefresh();
             setSessionData(authenticationResponse, { devMode });
             _onRefresh && _onRefresh(authenticationResponse);
             onRedirectCallback({ state, ...authenticationResponse });
@@ -281,7 +281,6 @@ export async function createClient(
         _authkitClientState = beginningState;
       }
     } catch (error: unknown) {
-      console.error(error);
       if (error instanceof RefreshError) {
         removeSessionData({ devMode });
         // fire the refresh failure UNLESS this is the initial refresh attempt
@@ -290,10 +289,8 @@ export async function createClient(
         beginningState !== "INITIAL" &&
           _onRefreshFailure &&
           _onRefreshFailure({ signIn: signIn });
+        _authkitClientState = "ERROR";
       }
-      // TODO: if a lock couldn't be acquired... that's not a fatal error.
-      // maybe that's another state?
-      _authkitClientState = "ERROR";
       throw error;
     } finally {
       await lock.releaseLock(REFRESH_LOCK);
