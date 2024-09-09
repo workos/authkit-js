@@ -22,6 +22,7 @@ interface RedirectOptions {
   state?: any;
   invitationToken?: string;
   passwordResetToken?: string;
+  context?: string;
 }
 
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
@@ -99,6 +100,7 @@ export async function createClient(
   async function _redirect({
     type,
     state,
+    context,
     invitationToken,
     passwordResetToken,
   }: RedirectOptions) {
@@ -109,6 +111,7 @@ export async function createClient(
       clientId: _clientId,
       redirectUri: _redirectUri,
       screenHint: type,
+      context,
       codeChallenge,
       codeChallengeMethod: "S256",
       invitationToken,

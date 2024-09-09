@@ -6,6 +6,7 @@ export function getAuthorizationUrl(
   {
     clientId,
     connectionId,
+    context,
     domainHint,
     loginHint,
     organizationId,
@@ -33,6 +34,7 @@ export function getAuthorizationUrl(
 
   const query = toQueryString({
     connection_id: connectionId,
+    context,
     organization_id: organizationId,
     domain_hint: domainHint,
     login_hint: loginHint,
