@@ -6,7 +6,7 @@ application.
 ## Installation
 
 ```
-npm i @workos-inc/authkit-js
+npm install @workos-inc/authkit-js
 ```
 
 ## Usage
@@ -17,3 +17,7 @@ const authkit = await createClient(clientId: 'your-client-id');
 const user = authkit.getUser();
 const accessToken = await authkit.getAccessToken();
 ```
+
+## Impersonation support is coming soon
+
+Impersonation is not currently supported in authkit-js. We are targeting EOY 2024.
