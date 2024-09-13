@@ -226,7 +226,13 @@ export async function createClient(
         }
       } else {
         _authkitClientState = "ERROR";
-        console.error("Received code but missing codeVerifier");
+        console.error(`Couldn't exchange code.
+
+An authorization_code was supplied for a login which did not originate at the application. This could happen for various reasons:
+
+* This could have been an attempted Login CSRF attack. You were not affected.
+* The developer may not have configured a Login Initiation endpoint.
+* Was this an Impersonation attempt? Impersonation support is coming soon.`);
       }
     }
 
