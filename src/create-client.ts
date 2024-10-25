@@ -83,8 +83,8 @@ export async function createClient(
           return true;
         }
 
-        const tokenRefresBufferInSeconds = refreshBufferInterval * 1000;
-        const refreshTime = expiresAt - tokenRefresBufferInSeconds;
+        const tokenRefreshBufferInSeconds = refreshBufferInterval * 1000;
+        const refreshTime = expiresAt - tokenRefreshBufferInSeconds;
         return refreshTime < Date.now();
     }
   };
