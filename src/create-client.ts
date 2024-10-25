@@ -53,6 +53,7 @@ export async function createClient(
     onRedirectCallback = (_: RedirectParams) => {},
     onRefresh: _onRefresh,
     onRefreshFailure: _onRefreshFailure,
+    refreshBufferInterval = 10,
   } = options;
 
   const _clientId = clientId;
@@ -82,9 +83,8 @@ export async function createClient(
           return true;
         }
 
-        // TODO: should LEEWAY be configurable?
-        const LEEWAY = 10 * 1000; // 10 seconds
-        const refreshTime = expiresAt - LEEWAY;
+        const tokenRefreshBufferInSeconds = refreshBufferInterval * 1000;
+        const refreshTime = expiresAt - tokenRefreshBufferInSeconds;
         return refreshTime < Date.now();
     }
   };

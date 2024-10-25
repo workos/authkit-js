@@ -2,6 +2,11 @@ import { AuthenticationResponse } from "./authentication-response.interface";
 import { createClient } from "../create-client";
 
 export interface CreateClientOptions {
+  /**
+   * How many seconds before the access token expiration to attempt a refresh.
+   */
+  refreshBufferInterval?: number;
+
   apiHostname?: string;
   https?: boolean;
   port?: number;
