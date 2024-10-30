@@ -9,10 +9,10 @@ describe("pkce", () => {
       });
     });
 
-    it("returns a `codeCHallenge` this base64url encoded SHA256 hash of `codeVerifier`", async () => {
+    it("returns a `codeChallenge` that is base64url encoded SHA256 hash of `codeVerifier`", async () => {
       const { codeVerifier, codeChallenge } = await createPkceChallenge();
 
-      // Rimilar but independent implementation of `createCodeChallenge` as a sanity check
+      // Similar but independent implementation of `createCodeChallenge` as a sanity check
       // that these two values are indeed related.
       const encoder = new TextEncoder();
       const data = encoder.encode(codeVerifier);
