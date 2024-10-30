@@ -66,13 +66,6 @@ export class LockError extends Error {
     readonly lockName: string,
     type: "Native" | "Vendor",
   ) {
-    const message = (() => {
-      switch (name) {
-        case "AcquisitionTimeoutError":
-          return `Lock acquisition timeout for "${lockName}".`;
-      }
-    })();
-
-    super(`${message} (${type})`);
+    super(`Lock acquisition timed out for "${lockName}" (${type})`);
   }
 }
