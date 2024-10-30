@@ -14,8 +14,8 @@ import {
 } from "./utils";
 import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
-import Lock from "./vendor/browser-tabs-lock";
 import { LoginRequiredError, RefreshError } from "./errors";
+import { withLock, LockError } from "./utils/locking";
 
 interface RedirectOptions {
   type: "sign-in" | "sign-up";
@@ -249,12 +249,10 @@ An authorization_code was supplied for a login which did not originate at the ap
     organizationId,
   }: { organizationId?: string } = {}) {
     const beginningState = _authkitClientState;
+    _authkitClientState = "AUTHENTICATING";
 
-    const lock = new Lock();
     try {
-      _authkitClientState = "AUTHENTICATING";
-
-      if (await lock.acquireLock(REFRESH_LOCK)) {
+      await withLock(REFRESH_LOCK, async () => {
         if (organizationId) {
           sessionStorage.setItem(
             ORGANIZATION_ID_SESSION_STORAGE_KEY,
@@ -282,14 +280,20 @@ An authorization_code was supplied for a login which did not originate at the ap
         _authkitClientState = "AUTHENTICATED";
         setSessionData(authenticationResponse, { devMode });
         _onRefresh && _onRefresh(authenticationResponse);
-      } else {
-        // couldn't acquire lock
-        console.warn("Couldn't acquire refresh lock");
+      });
+    } catch (error) {
+      if (
+        error instanceof LockError &&
+        error.name === "AcquisitionTimeoutError"
+      ) {
+        console.warn("Couldn't acquire refresh lock.");
 
         // preserving the original state so that we can try again next time
         _authkitClientState = beginningState;
+
+        return;
       }
-    } catch (error: unknown) {
+
       console.error(error);
       if (error instanceof RefreshError) {
         removeSessionData({ devMode });
@@ -304,8 +308,6 @@ An authorization_code was supplied for a login which did not originate at the ap
       // maybe that's another state?
       _authkitClientState = "ERROR";
       throw error;
-    } finally {
-      await lock.releaseLock(REFRESH_LOCK);
     }
   }
 

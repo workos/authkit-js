@@ -60,7 +60,7 @@ async function withVendorLock<T>(
   }
 }
 
-class LockError extends Error {
+export class LockError extends Error {
   constructor(
     override readonly name: "AcquisitionTimeoutError",
     readonly lockName: string,
