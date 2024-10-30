@@ -31,6 +31,8 @@ const DEFAULT_HOSTNAME = "api.workos.com";
 
 const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
+const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
+
 export async function createClient(
   clientId: string,
   options: CreateClientOptions = {},
@@ -243,8 +245,6 @@ An authorization_code was supplied for a login which did not originate at the ap
     window.history.replaceState({}, "", cleanUrl);
   }
 
-  const REFRESH_LOCK = "WORKOS_REFRESH_SESSION";
-
   async function refreshSession({
     organizationId,
   }: { organizationId?: string } = {}) {
@@ -252,7 +252,7 @@ An authorization_code was supplied for a login which did not originate at the ap
     _authkitClientState = "AUTHENTICATING";
 
     try {
-      await withLock(REFRESH_LOCK, async () => {
+      await withLock(REFRESH_LOCK_NAME, async () => {
         if (organizationId) {
           sessionStorage.setItem(
             ORGANIZATION_ID_SESSION_STORAGE_KEY,
