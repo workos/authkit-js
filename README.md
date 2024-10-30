@@ -13,7 +13,7 @@ npm install @workos-inc/authkit-js
 
 ```js
 import { createClient } from '@workos-inc/authkit-js'
-const authkit = await createClient(clientId: 'your-client-id');
+const authkit = await createClient('your-client-id');
 const user = authkit.getUser();
 const accessToken = await authkit.getAccessToken();
 ```
