@@ -19,11 +19,11 @@ jobs:
       - name: Setup
         run: npm ci
 
-      - name: Check formatting
+      - name: Format
         run: npm run format:check
 
       - name: Build
         run: npm run build
 
-      - name: Run Tests
+      - name: Test
         run: npm test
