@@ -50,7 +50,7 @@ async function withVendorLock<T>(
   const lock = new Lock();
 
   try {
-    if (await lock.acquireLock(lockName)) {
+    if (await lock.acquireLock(lockName, DEFAULT_LOCK_TIMEOUT_MS)) {
       return await callback();
     } else {
       throw new LockError("AcquisitionTimeoutError", lockName, "Vendor");
