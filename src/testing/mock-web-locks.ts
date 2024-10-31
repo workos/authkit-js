@@ -48,7 +48,7 @@ export class MockWebLocks implements LockManager {
         throw new DOMException("Abort error.", "AbortError");
       }
     } finally {
-      lock.releaseLock(name);
+      await lock.releaseLock(name);
     }
   }
 
