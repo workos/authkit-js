@@ -9,6 +9,7 @@
     "dist",
     "src",
     "!src/**/*.test.ts",
+    "!src/testing/**/*",
     "LICENSE",
     "README.md"
   ],

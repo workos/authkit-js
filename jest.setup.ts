@@ -12,3 +12,14 @@ Object.assign(globalThis, {
 Object.assign(globalThis.crypto, {
   subtle,
 });
+
+// jest@29 uses jsdom@20 which includes its own implementation of `AbortSignal`
+// that does not implement `timeout`. This workaround can be removed when jest@30
+// is released as it depends on jsdom@22 which _does_ implement `timeout`.
+AbortSignal.timeout = (ms: number) => {
+  const controller = new AbortController();
+
+  setTimeout(() => controller.abort("Timeout reached."), ms);
+
+  return controller.signal;
+};
