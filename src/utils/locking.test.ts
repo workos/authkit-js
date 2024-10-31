@@ -39,17 +39,17 @@ describe("locking", () => {
         describe("when the lock is held by another process", () => {
           describe("when the lock is released before the timeout", () => {
             it("returns the result of the callback", async () => {
-              const lockedTask = withLock("LOCK_NAME", () => delay(2000));
+              const lockedTask = withLock("LOCK_NAME", () => delay(500));
 
               // Ensure the locked task gets started first.
-              await Promise.race([lockedTask, delay(500)]);
+              await Promise.race([lockedTask, delay(100)]);
 
               const requestingTask = withLock("LOCK_NAME", () => true);
 
               // Check that the requesting task is indeed waiting and not resolved yet.
               await expect(
                 Promise.race([
-                  delay(500).then(() => "delayFinishedFirst"),
+                  delay(200).then(() => "delayFinishedFirst"),
                   lockedTask.then(() => "lockedProcessFinishedFirst"),
                   requestingTask.then(() => "requestingProcessFinishedFirst"),
                 ]),
@@ -62,19 +62,19 @@ describe("locking", () => {
 
           describe("when the lock is not released before the timeout", () => {
             it("throws a `LockError`", async () => {
-              const lockedTask = withLock("LOCK_NAME", () => delay(2000));
+              const lockedTask = withLock("LOCK_NAME", () => delay(500));
 
               // Ensure the locked task gets started first.
-              await Promise.race([lockedTask, delay(500)]);
+              await Promise.race([lockedTask, delay(100)]);
 
               const requestingTask = withLock("LOCK_NAME", () => true, {
-                timeout: 1000,
+                timeout: 300,
               });
 
               // Check that the requesting task is indeed waiting and not resolved yet.
               await expect(
                 Promise.race([
-                  delay(500).then(() => "delayFinishedFirst"),
+                  delay(200).then(() => "delayFinishedFirst"),
                   lockedTask.then(() => "lockedProcessFinishedFirst"),
                   requestingTask.then(() => "requestingProcessFinishedFirst"),
                 ]),
