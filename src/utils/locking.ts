@@ -5,24 +5,26 @@ const DEFAULT_LOCK_TIMEOUT_MS = 10_000;
 export function withLock<T>(
   lockName: string,
   callback: () => T | Promise<T>,
+  { timeout = DEFAULT_LOCK_TIMEOUT_MS } = {},
 ): Promise<T> {
   if (!lockName) {
     throw new TypeError("lockName is required and must be a non-empty string.");
   }
 
   return "locks" in navigator
-    ? withNativeLock(lockName, callback)
-    : withVendorLock(lockName, callback);
+    ? withNativeLock(lockName, callback, timeout)
+    : withVendorLock(lockName, callback, timeout);
 }
 
 async function withNativeLock<T>(
   lockName: string,
   callback: () => T | Promise<T>,
+  timeout: number,
 ) {
   try {
     return await navigator.locks.request(
       lockName,
-      { signal: AbortSignal.timeout(DEFAULT_LOCK_TIMEOUT_MS) },
+      { signal: AbortSignal.timeout(timeout) },
       callback,
     );
   } catch (error) {
@@ -46,11 +48,12 @@ async function withNativeLock<T>(
 async function withVendorLock<T>(
   lockName: string,
   callback: () => T | Promise<T>,
+  timeout: number,
 ) {
   const lock = new Lock();
 
   try {
-    if (await lock.acquireLock(lockName, DEFAULT_LOCK_TIMEOUT_MS)) {
+    if (await lock.acquireLock(lockName, timeout)) {
       return await callback();
     } else {
       throw new LockError("AcquisitionTimeoutError", lockName, "Vendor");
