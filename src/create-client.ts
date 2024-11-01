@@ -319,6 +319,11 @@ An authorization_code was supplied for a login which did not originate at the ap
     }
   }
 
+  function dispose() {
+    clearTimeout(_refreshTimer);
+    memoryStorage.reset();
+  }
+
   // we wait for the client to be initialized (redirect callback or refresh token)
   await _initialize();
 
@@ -328,5 +333,6 @@ An authorization_code was supplied for a login which did not originate at the ap
     getUser,
     getAccessToken,
     signOut,
+    dispose,
   };
 }
