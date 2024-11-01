@@ -293,6 +293,31 @@ An authorization_code was supplied for a login which did not originate at the ap
     }
   }
 
+  #shouldRefresh() {
+    switch (this.#authkitClientState) {
+      case "INITIAL":
+      case "AUTHENTICATING":
+        return true;
+      case "ERROR":
+        return false;
+      case "AUTHENTICATED":
+        const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
+          | string
+          | undefined;
+        const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
+          | number
+          | undefined;
+
+        if (!accessToken || !expiresAt) {
+          return true;
+        }
+
+        const tokenRefreshBufferInSeconds = this.#refreshBufferInterval * 1000;
+        const refreshTime = expiresAt - tokenRefreshBufferInSeconds;
+        return refreshTime < Date.now();
+    }
+  }
+
   async #redirect({
     context,
     invitationToken,
@@ -324,31 +349,6 @@ An authorization_code was supplied for a login which did not originate at the ap
 
   #getAccessToken() {
     return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
-  }
-
-  #shouldRefresh() {
-    switch (this.#authkitClientState) {
-      case "INITIAL":
-      case "AUTHENTICATING":
-        return true;
-      case "ERROR":
-        return false;
-      case "AUTHENTICATED":
-        const accessToken = memoryStorage.getItem(storageKeys.accessToken) as
-          | string
-          | undefined;
-        const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
-          | number
-          | undefined;
-
-        if (!accessToken || !expiresAt) {
-          return true;
-        }
-
-        const tokenRefreshBufferInSeconds = this.#refreshBufferInterval * 1000;
-        const refreshTime = expiresAt - tokenRefreshBufferInSeconds;
-        return refreshTime < Date.now();
-    }
   }
 
   get #useCookie() {
