@@ -44,7 +44,7 @@ describe("create-client", () => {
       });
     });
 
-    describe("when the current route matches the redirect URI", () => {
+    describe("when the current route matches the redirect URI and has a `code`", () => {
       describe("when no `codeVerifier` is present in session storage", () => {
         it("logs an error", async () => {
           jest.spyOn(console, "error").mockImplementation();
@@ -182,7 +182,7 @@ describe("create-client", () => {
         restoreLocation();
       });
 
-      it("generates a PKCE challenge and redirects to the AuthKit sign-ip page", async () => {
+      it("generates a PKCE challenge and redirects to the AuthKit sign-up page", async () => {
         const { scope } = nockRefresh();
         expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
 
