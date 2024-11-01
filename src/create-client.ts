@@ -18,11 +18,11 @@ import { LoginRequiredError, RefreshError } from "./errors";
 import { withLock, LockError } from "./utils/locking";
 
 interface RedirectOptions {
-  type: "sign-in" | "sign-up";
-  state?: any;
+  context?: string;
   invitationToken?: string;
   passwordResetToken?: string;
-  context?: string;
+  state?: any;
+  type: "sign-in" | "sign-up";
 }
 
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
@@ -100,24 +100,24 @@ export async function createClient(
   }
 
   async function _redirect({
-    type,
-    state,
     context,
     invitationToken,
     passwordResetToken,
+    state,
+    type,
   }: RedirectOptions) {
     const { codeVerifier, codeChallenge } = await createPkceChallenge();
     // store the code verifier in session storage for later use (after the redirect back from authkit)
     window.sessionStorage.setItem(storageKeys.codeVerifier, codeVerifier);
     const url = getAuthorizationUrl(_baseUrl, {
       clientId: _clientId,
-      redirectUri: _redirectUri,
-      screenHint: type,
-      context,
       codeChallenge,
       codeChallengeMethod: "S256",
+      context,
       invitationToken,
       passwordResetToken,
+      redirectUri: _redirectUri,
+      screenHint: type,
       state: state ? JSON.stringify(state) : undefined,
     });
 
