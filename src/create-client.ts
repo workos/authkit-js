@@ -20,6 +20,8 @@ import { withLock, LockError } from "./utils/locking";
 interface RedirectOptions {
   context?: string;
   invitationToken?: string;
+  loginHint?: string;
+  organizationId?: string;
   passwordResetToken?: string;
   state?: any;
   type: "sign-in" | "sign-up";
@@ -102,6 +104,8 @@ export async function createClient(
   async function _redirect({
     context,
     invitationToken,
+    loginHint,
+    organizationId,
     passwordResetToken,
     state,
     type,
@@ -115,6 +119,8 @@ export async function createClient(
       codeChallengeMethod: "S256",
       context,
       invitationToken,
+      loginHint,
+      organizationId,
       passwordResetToken,
       redirectUri: _redirectUri,
       screenHint: type,
