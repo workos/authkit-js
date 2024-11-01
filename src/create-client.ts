@@ -39,7 +39,7 @@ const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
-class Client {
+export class Client {
   #state: State;
   #refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
