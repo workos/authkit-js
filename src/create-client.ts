@@ -40,7 +40,7 @@ const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
 class Client {
-  #authkitClientState: State;
+  #state: State;
   #refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   readonly #clientId: string;
@@ -84,7 +84,7 @@ class Client {
     this.#baseUrl = `${https ? "https" : "http"}://${apiHostname}${
       port ? `:${port}` : ""
     }`;
-    this.#authkitClientState = "INITIAL";
+    this.#state = "INITIAL";
     this.#onBeforeAutoRefresh = onBeforeAutoRefresh;
     this.#onRedirectCallback = onRedirectCallback;
     this.#onRefresh = onRefresh;
@@ -93,7 +93,7 @@ class Client {
   }
 
   async initialize() {
-    if (this.#authkitClientState !== "INITIAL") {
+    if (this.#state !== "INITIAL") {
       return;
     }
 
@@ -159,7 +159,7 @@ class Client {
   }
 
   async #handleCallback() {
-    if (this.#authkitClientState !== "INITIAL") {
+    if (this.#state !== "INITIAL") {
       return;
     }
 
@@ -167,7 +167,7 @@ class Client {
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
     const state = stateParam ? JSON.parse(stateParam) : undefined;
-    this.#authkitClientState = "AUTHENTICATING";
+    this.#state = "AUTHENTICATING";
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
@@ -186,18 +186,18 @@ class Client {
           });
 
           if (authenticationResponse) {
-            this.#authkitClientState = "AUTHENTICATED";
+            this.#state = "AUTHENTICATED";
             this.#scheduleAutomaticRefresh();
             setSessionData(authenticationResponse, { devMode: this.#devMode });
             this.#onRefresh && this.#onRefresh(authenticationResponse);
             this.#onRedirectCallback({ state, ...authenticationResponse });
           }
         } catch (error) {
-          this.#authkitClientState = "ERROR";
+          this.#state = "ERROR";
           console.error(error);
         }
       } else {
-        this.#authkitClientState = "ERROR";
+        this.#state = "ERROR";
         console.error(`Couldn't exchange code.
 
 An authorization_code was supplied for a login which did not originate at the application. This could happen for various reasons:
@@ -230,8 +230,8 @@ An authorization_code was supplied for a login which did not originate at the ap
   }
 
   async #refreshSession({ organizationId }: { organizationId?: string } = {}) {
-    const beginningState = this.#authkitClientState;
-    this.#authkitClientState = "AUTHENTICATING";
+    const beginningState = this.#state;
+    this.#state = "AUTHENTICATING";
 
     try {
       await withLock(REFRESH_LOCK_NAME, async () => {
@@ -259,7 +259,7 @@ An authorization_code was supplied for a login which did not originate at the ap
           useCookie: this.#useCookie,
         });
 
-        this.#authkitClientState = "AUTHENTICATED";
+        this.#state = "AUTHENTICATED";
         setSessionData(authenticationResponse, { devMode: this.#devMode });
         this.#onRefresh && this.#onRefresh(authenticationResponse);
       });
@@ -271,7 +271,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         console.warn("Couldn't acquire refresh lock.");
 
         // preserving the original state so that we can try again next time
-        this.#authkitClientState = beginningState;
+        this.#state = beginningState;
 
         return;
       }
@@ -288,13 +288,13 @@ An authorization_code was supplied for a login which did not originate at the ap
       }
       // TODO: if a lock couldn't be acquired... that's not a fatal error.
       // maybe that's another state?
-      this.#authkitClientState = "ERROR";
+      this.#state = "ERROR";
       throw error;
     }
   }
 
   #shouldRefresh() {
-    switch (this.#authkitClientState) {
+    switch (this.#state) {
       case "INITIAL":
       case "AUTHENTICATING":
         return true;
