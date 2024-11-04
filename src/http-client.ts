@@ -25,23 +25,15 @@ export class HttpClient {
     organizationId?: string;
     useCookie: boolean;
   }) {
-    const response = await fetch(
-      `${this.#baseUrl}/user_management/authenticate`,
-      {
-        method: "POST",
-        ...(useCookie && { credentials: "include" }),
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          client_id: this.#clientId,
-          grant_type: "refresh_token",
-          ...(!useCookie && { refresh_token: refreshToken }),
-          organization_id: organizationId,
-        }),
+    const response = await this.#post("/user_management/authenticate", {
+      useCookie,
+      body: {
+        client_id: this.#clientId,
+        grant_type: "refresh_token",
+        ...(!useCookie && { refresh_token: refreshToken }),
+        organization_id: organizationId,
       },
-    );
+    });
 
     if (response.ok) {
       const data = (await response.json()) as AuthenticationResponseRaw;
@@ -61,23 +53,15 @@ export class HttpClient {
     codeVerifier: string;
     useCookie: boolean;
   }) {
-    const response = await fetch(
-      `${this.#baseUrl}/user_management/authenticate`,
-      {
-        method: "POST",
-        ...(useCookie && { credentials: "include" }),
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code,
-          client_id: this.#clientId,
-          grant_type: "authorization_code",
-          code_verifier: codeVerifier,
-        }),
+    const response = await this.#post("/user_management/authenticate", {
+      useCookie,
+      body: {
+        code,
+        client_id: this.#clientId,
+        grant_type: "authorization_code",
+        code_verifier: codeVerifier,
       },
-    );
+    });
 
     if (response.ok) {
       const data = (await response.json()) as AuthenticationResponseRaw;
@@ -85,6 +69,21 @@ export class HttpClient {
     } else {
       console.log("error", await response.json());
     }
+  }
+
+  #post(
+    path: "/user_management/authenticate",
+    { body, useCookie }: { body: Record<string, unknown>; useCookie: boolean },
+  ) {
+    return fetch(new URL(path, this.#baseUrl), {
+      method: "POST",
+      ...(useCookie && { credentials: "include" }),
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
   }
 
   getAuthorizationUrl({
