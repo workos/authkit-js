@@ -5,10 +5,6 @@ import {
 } from "./interfaces";
 import { NoClientIdProvidedException } from "./exceptions";
 import {
-  authenticateWithCode,
-  authenticateWithRefreshToken,
-  getAuthorizationUrl,
-  getLogoutUrl,
   isRedirectCallback,
   memoryStorage,
   createPkceChallenge,
@@ -20,6 +16,7 @@ import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
 import { LoginRequiredError, RefreshError } from "./errors";
 import { withLock, LockError } from "./utils/locking";
+import { HttpClient } from "./http-client";
 
 interface RedirectOptions {
   context?: string;
@@ -43,9 +40,8 @@ export class Client {
   #state: State;
   #refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
-  readonly #clientId: string;
+  readonly #httpClient: HttpClient;
   readonly #redirectUri: string;
-  readonly #baseUrl: string;
   readonly #devMode: boolean;
   readonly #onBeforeAutoRefresh: () => boolean;
   readonly #onRedirectCallback: (params: RedirectParams) => void;
@@ -78,12 +74,14 @@ export class Client {
       throw new NoClientIdProvidedException();
     }
 
+    this.#httpClient = new HttpClient({
+      clientId,
+      baseUrl: `${https ? "https" : "http"}://${apiHostname}${
+        port ? `:${port}` : ""
+      }`,
+    });
     this.#devMode = devMode;
-    this.#clientId = clientId;
     this.#redirectUri = redirectUri;
-    this.#baseUrl = `${https ? "https" : "http"}://${apiHostname}${
-      port ? `:${port}` : ""
-    }`;
     this.#state = "INITIAL";
     this.#onBeforeAutoRefresh = onBeforeAutoRefresh;
     this.#onRedirectCallback = onRedirectCallback;
@@ -120,7 +118,7 @@ export class Client {
   }
 
   signOut() {
-    const url = getLogoutUrl(this.#baseUrl);
+    const url = this.#httpClient.getLogoutUrl();
     if (url) {
       removeSessionData({ devMode: this.#devMode });
       window.location.assign(url);
@@ -177,13 +175,12 @@ export class Client {
     if (code) {
       if (codeVerifier) {
         try {
-          const authenticationResponse = await authenticateWithCode({
-            baseUrl: this.#baseUrl,
-            clientId: this.#clientId,
-            code,
-            codeVerifier,
-            useCookie: this.#useCookie,
-          });
+          const authenticationResponse =
+            await this.#httpClient.authenticateWithCode({
+              code,
+              codeVerifier,
+              useCookie: this.#useCookie,
+            });
 
           if (authenticationResponse) {
             this.#state = "AUTHENTICATED";
@@ -251,13 +248,12 @@ An authorization_code was supplied for a login which did not originate at the ap
           }
         }
 
-        const authenticationResponse = await authenticateWithRefreshToken({
-          baseUrl: this.#baseUrl,
-          clientId: this.#clientId,
-          refreshToken: getRefreshToken({ devMode: this.#devMode }),
-          organizationId,
-          useCookie: this.#useCookie,
-        });
+        const authenticationResponse =
+          await this.#httpClient.authenticateWithRefreshToken({
+            refreshToken: getRefreshToken({ devMode: this.#devMode }),
+            organizationId,
+            useCookie: this.#useCookie,
+          });
 
         this.#state = "AUTHENTICATED";
         setSessionData(authenticationResponse, { devMode: this.#devMode });
@@ -330,8 +326,7 @@ An authorization_code was supplied for a login which did not originate at the ap
     const { codeVerifier, codeChallenge } = await createPkceChallenge();
     // store the code verifier in session storage for later use (after the redirect back from authkit)
     window.sessionStorage.setItem(storageKeys.codeVerifier, codeVerifier);
-    const url = getAuthorizationUrl(this.#baseUrl, {
-      clientId: this.#clientId,
+    const url = this.#httpClient.getAuthorizationUrl({
       codeChallenge,
       codeChallengeMethod: "S256",
       context,

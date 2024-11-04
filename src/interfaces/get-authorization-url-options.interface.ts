@@ -1,5 +1,4 @@
 export interface GetAuthorizationUrlOptions {
-  clientId: string;
   connectionId?: string;
   context?: string;
   organizationId?: string;
