@@ -117,8 +117,13 @@ export class Client {
     return this.#redirect({ ...opts, type: "sign-up" });
   }
 
-  signOut() {
-    const url = this.#httpClient.getLogoutUrl();
+  signOut(): void {
+    const accessToken = memoryStorage.getItem(storageKeys.accessToken);
+    if (typeof accessToken !== "string") return;
+    const { sid: sessionId } = getClaims(accessToken);
+
+    const url = this.#httpClient.getLogoutUrl(sessionId);
+
     if (url) {
       removeSessionData({ devMode: this.#devMode });
       window.location.assign(url);

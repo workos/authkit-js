@@ -4,8 +4,7 @@ import {
   GetAuthorizationUrlOptions,
 } from "./interfaces";
 import { deserializeAuthenticationResponse } from "./serializers";
-import { memoryStorage, storageKeys, toQueryString } from "./utils";
-import { getClaims } from "./utils/session-data";
+import { toQueryString } from "./utils";
 
 export class HttpClient {
   readonly #baseUrl: string;
@@ -134,11 +133,11 @@ export class HttpClient {
     return `${this.#baseUrl}/user_management/authorize?${query}`;
   }
 
-  getLogoutUrl() {
-    const accessToken = memoryStorage.getItem(storageKeys.accessToken);
-    if (typeof accessToken !== "string") return null;
+  getLogoutUrl(sessionId: string) {
+    const url = new URL("/user_management/sessions/logout", this.#baseUrl);
 
-    const { sid: sessionId } = getClaims(accessToken);
-    return `${this.#baseUrl}/user_management/sessions/logout?session_id=${sessionId}`;
+    url.searchParams.set("session_id", sessionId);
+
+    return url;
   }
 }
