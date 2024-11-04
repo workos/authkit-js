@@ -5,7 +5,6 @@ describe("HttpClient", () => {
 
   beforeEach(() => {
     httpClient = new HttpClient({
-      baseUrl: "https://api.workos.com",
       clientId: "123",
     });
   });

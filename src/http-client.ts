@@ -6,12 +6,26 @@ import {
 import { deserializeAuthenticationResponse } from "./serializers";
 import { toQueryString } from "./utils";
 
+const DEFAULT_HOSTNAME = "api.workos.com";
+
 export class HttpClient {
   readonly #baseUrl: string;
   readonly #clientId: string;
 
-  constructor({ baseUrl, clientId }: { baseUrl: string; clientId: string }) {
-    this.#baseUrl = baseUrl;
+  constructor({
+    clientId,
+    hostname = DEFAULT_HOSTNAME,
+    port,
+    https = true,
+  }: {
+    clientId: string;
+    hostname?: string;
+    port?: number;
+    https?: boolean;
+  }) {
+    this.#baseUrl = `${https ? "https" : "http"}://${hostname}${
+      port ? `:${port}` : ""
+    }`;
     this.#clientId = clientId;
   }
 

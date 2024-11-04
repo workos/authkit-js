@@ -30,8 +30,6 @@ interface RedirectOptions {
 
 type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
 
-const DEFAULT_HOSTNAME = "api.workos.com";
-
 const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
@@ -54,8 +52,8 @@ export class Client {
   constructor(
     clientId: string,
     {
-      apiHostname = DEFAULT_HOSTNAME,
-      https = true,
+      apiHostname: hostname,
+      https,
       port,
       redirectUri = window.origin,
       devMode = location.hostname === "localhost" ||
@@ -74,12 +72,7 @@ export class Client {
       throw new NoClientIdProvidedException();
     }
 
-    this.#httpClient = new HttpClient({
-      clientId,
-      baseUrl: `${https ? "https" : "http"}://${apiHostname}${
-        port ? `:${port}` : ""
-      }`,
-    });
+    this.#httpClient = new HttpClient({ clientId, hostname, port, https });
     this.#devMode = devMode;
     this.#redirectUri = redirectUri;
     this.#state = "INITIAL";
