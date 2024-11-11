@@ -35,7 +35,7 @@ type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
 
 const DEFAULT_HOSTNAME = "api.workos.com";
 
-const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
+export const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
@@ -227,6 +227,30 @@ An authorization_code was supplied for a login which did not originate at the ap
         this.#scheduleAutomaticRefresh();
       }
     }, 1000);
+  }
+
+  /**
+   * Switches to the requested organization.
+   *
+   * Redirects to the hosted login page for the given organization if the
+   * switch is unsuccessful.
+   */
+  async switchToOrganization({
+    organizationId,
+    signInOpts = {},
+  }: {
+    organizationId: string;
+    signInOpts?: Omit<RedirectOptions, "type" | "organizationId">;
+  }) {
+    try {
+      await this.#refreshSession({ organizationId });
+    } catch (error) {
+      if (error instanceof RefreshError) {
+        this.signIn({ ...signInOpts, organizationId });
+      } else {
+        throw error;
+      }
+    }
   }
 
   async #refreshSession({ organizationId }: { organizationId?: string } = {}) {

@@ -2,7 +2,10 @@
  * @jest-environment-options {"url": "https://example.com/callback?code=code_123"}
  */
 
-import { createClient } from "./create-client";
+import {
+  createClient,
+  ORGANIZATION_ID_SESSION_STORAGE_KEY,
+} from "./create-client";
 import { LoginRequiredError, RefreshError } from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
 import { storageKeys } from "./utils/storage-keys";
@@ -13,6 +16,7 @@ describe("create-client", () => {
 
   beforeEach(() => {
     sessionStorage.removeItem(storageKeys.codeVerifier);
+    sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
     localStorage.removeItem(storageKeys.refreshToken);
   });
 
@@ -342,6 +346,62 @@ describe("create-client", () => {
             [expect.any(RefreshError)],
           ]);
           scope.done();
+        });
+      });
+    });
+
+    describe("switchToOrganization", () => {
+      it("refreshes the session with the given organization ID", async () => {
+        const { scope: createClientScope } = nockRefresh();
+        const organizationId = "org_123abc";
+        const switchToOrgScope = nock("https://api.workos.com")
+          .post("/user_management/authenticate", {
+            client_id: "client_123abc",
+            grant_type: "refresh_token",
+            organization_id: organizationId,
+          })
+          .reply(200, {
+            user: {},
+            access_token: mockAccessToken(),
+            refresh_token: "refresh_token",
+            organization_id: organizationId,
+          });
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+
+        await client.switchToOrganization({ organizationId });
+        createClientScope.done();
+        switchToOrgScope.done();
+      });
+
+      it("redirects to the AuthKit sign-in page if the refresh fails", async () => {
+        const { scope: createClientScope } = nockRefresh();
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        createClientScope.done();
+
+        const organizationId = "org_123abc";
+        const switchToOrgScope = nock("https://api.workos.com")
+          .post("/user_management/authenticate", {
+            client_id: "client_123abc",
+            grant_type: "refresh_token",
+            organization_id: organizationId,
+          })
+          .reply(401, {});
+        const signInSpy = jest.spyOn(client, "signIn").mockImplementation();
+        jest.spyOn(console, "error").mockImplementation();
+
+        await client.switchToOrganization({
+          organizationId,
+          signInOpts: { state: { returnTo: "/somewhere" } },
+        });
+        switchToOrgScope.done();
+
+        expect(signInSpy).toHaveBeenCalledWith({
+          organizationId: "org_123abc",
+          state: { returnTo: "/somewhere" },
         });
       });
     });
