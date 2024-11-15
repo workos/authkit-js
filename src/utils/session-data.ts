@@ -30,7 +30,7 @@ export function setSessionData(
     globalThis.dispatchEvent(
       new CustomEvent("authkit:tokenchange", {
         detail: { accessToken },
-      })
+      }),
     );
     memoryStorage.setItem(storageKeys.accessToken, accessToken);
   }
@@ -68,7 +68,7 @@ declare global {
   interface Window {
     addEventListener<K extends keyof CustomEventMap>(
       type: K,
-      listener: (this: Document, ev: CustomEventMap[K]) => void
+      listener: (this: Document, ev: CustomEventMap[K]) => void,
     ): void;
     dispatchEvent<K extends keyof CustomEventMap>(ev: CustomEventMap[K]): void;
   }
