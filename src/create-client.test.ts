@@ -284,9 +284,6 @@ describe("create-client", () => {
 
       describe("when the current session is not authenticated", () => {
         it("returns `null`", async () => {
-          const consoleErrorSpy = jest
-            .spyOn(console, "error")
-            .mockImplementation();
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
               client_id: "client_123abc",
@@ -300,9 +297,6 @@ describe("create-client", () => {
           const user = client.getUser();
 
           expect(user).toBeNull();
-          expect(consoleErrorSpy.mock.calls).toEqual([
-            [expect.any(RefreshError)],
-          ]);
           scope.done();
         });
       });
@@ -325,9 +319,6 @@ describe("create-client", () => {
 
       describe("when the current session is not authenticated", () => {
         it("throws a `LoginRequiredError`", async () => {
-          const consoleErrorSpy = jest
-            .spyOn(console, "error")
-            .mockImplementation();
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
               client_id: "client_123abc",
@@ -341,10 +332,6 @@ describe("create-client", () => {
           await expect(client.getAccessToken()).rejects.toThrow(
             LoginRequiredError,
           );
-
-          expect(consoleErrorSpy.mock.calls).toEqual([
-            [expect.any(RefreshError)],
-          ]);
           scope.done();
         });
       });
@@ -391,7 +378,7 @@ describe("create-client", () => {
           })
           .reply(401, {});
         const signInSpy = jest.spyOn(client, "signIn").mockImplementation();
-        jest.spyOn(console, "error").mockImplementation();
+        jest.spyOn(console, "debug").mockImplementation();
 
         await client.switchToOrganization({
           organizationId,

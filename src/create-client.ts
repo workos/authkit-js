@@ -220,7 +220,7 @@ An authorization_code was supplied for a login which did not originate at the ap
       if (this.#shouldRefresh() && this.#onBeforeAutoRefresh()) {
         this.#refreshSession()
           .catch((e) => {
-            console.error(e);
+            console.debug(e);
           })
           .then(() => this.#scheduleAutomaticRefresh);
       } else {
@@ -300,7 +300,10 @@ An authorization_code was supplied for a login which did not originate at the ap
         return;
       }
 
-      console.error(error);
+      if (beginningState !== "INITIAL") {
+        console.debug(error);
+      }
+
       if (error instanceof RefreshError) {
         removeSessionData({ devMode: this.#devMode });
         // fire the refresh failure UNLESS this is the initial refresh attempt
@@ -310,8 +313,6 @@ An authorization_code was supplied for a login which did not originate at the ap
           this.#onRefreshFailure &&
           this.#onRefreshFailure({ signIn: this.signIn.bind(this) });
       }
-      // TODO: if a lock couldn't be acquired... that's not a fatal error.
-      // maybe that's another state?
       this.#state = "ERROR";
       throw error;
     }
