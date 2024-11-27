@@ -1,3 +1,4 @@
+import { CodeExchangeError } from "../errors";
 import { AuthenticationResponseRaw } from "../interfaces";
 import { deserializeAuthenticationResponse } from "../serializers";
 
@@ -31,7 +32,8 @@ export async function authenticateWithCode(
   if (response.ok) {
     const data = (await response.json()) as AuthenticationResponseRaw;
     return deserializeAuthenticationResponse(data);
-  } else {
-    console.log("error", await response.json());
   }
+
+  const error = await response.json();
+  throw new CodeExchangeError(error.error_description);
 }

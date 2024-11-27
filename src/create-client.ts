@@ -33,7 +33,7 @@ interface RedirectOptions {
 
 type State =
   | { tag: "INITIAL" }
-  | { tag: "AUTHENTICATING" }
+  | { tag: "AUTHENTICATING"; response: Promise<AuthenticationResponse> }
   | { tag: "AUTHENTICATED" }
   | { tag: "ERROR" };
 
@@ -171,7 +171,6 @@ export class Client {
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
     const state = stateParam ? JSON.parse(stateParam) : undefined;
-    this.#state = { tag: "AUTHENTICATING" };
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
@@ -181,13 +180,17 @@ export class Client {
     if (code) {
       if (codeVerifier) {
         try {
-          const authenticationResponse = await authenticateWithCode({
-            baseUrl: this.#baseUrl,
-            clientId: this.#clientId,
-            code,
-            codeVerifier,
-            useCookie: this.#useCookie,
-          });
+          this.#state = {
+            tag: "AUTHENTICATING",
+            response: authenticateWithCode({
+              baseUrl: this.#baseUrl,
+              clientId: this.#clientId,
+              code,
+              codeVerifier,
+              useCookie: this.#useCookie,
+            }),
+          };
+          const authenticationResponse = await this.#state.response;
 
           if (authenticationResponse) {
             this.#state = { tag: "AUTHENTICATED" };
@@ -258,11 +261,30 @@ An authorization_code was supplied for a login which did not originate at the ap
   }
 
   async #refreshSession({ organizationId }: { organizationId?: string } = {}) {
-    const beginningState = this.#state;
-    this.#state = { tag: "AUTHENTICATING" };
+    if (this.#state.tag === "AUTHENTICATING") {
+      await this.#state.response;
+      return;
+    }
 
+    const beginningState = this.#state;
+
+    this.#state = {
+      tag: "AUTHENTICATING",
+      response: this.#doRefresh({ organizationId, beginningState }),
+    };
+
+    await this.#state.response;
+  }
+
+  async #doRefresh({
+    organizationId,
+    beginningState,
+  }: {
+    organizationId?: string;
+    beginningState: State;
+  }): Promise<AuthenticationResponse> {
     try {
-      await withLock(REFRESH_LOCK_NAME, async () => {
+      return await withLock(REFRESH_LOCK_NAME, async () => {
         if (organizationId) {
           sessionStorage.setItem(
             ORGANIZATION_ID_SESSION_STORAGE_KEY,
@@ -290,6 +312,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         this.#state = { tag: "AUTHENTICATED" };
         setSessionData(authenticationResponse, { devMode: this.#devMode });
         this.#onRefresh && this.#onRefresh(authenticationResponse);
+        return authenticationResponse;
       });
     } catch (error) {
       if (
@@ -300,8 +323,7 @@ An authorization_code was supplied for a login which did not originate at the ap
 
         // preserving the original state so that we can try again next time
         this.#state = beginningState;
-
-        return;
+        throw error;
       }
 
       if (beginningState.tag !== "INITIAL") {
