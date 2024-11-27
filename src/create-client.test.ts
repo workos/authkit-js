@@ -385,17 +385,26 @@ describe("create-client", () => {
           refreshScope.done();
         });
 
-        it("sends a request for each call", async () => {
+        it("only issues one request for multiple calls", async () => {
           const client = await clientWithExpiredAccessToken();
 
-          const { scope: refresh1 } = nockRefresh();
-          const { scope: refresh2 } = nockRefresh();
+          const { scope: refreshScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "refreshed-token",
+            },
+          });
 
-          const accessToken1 = client.getAccessToken();
-          const accessToken2 = client.getAccessToken();
-          await Promise.all([accessToken1, accessToken2]);
-          refresh1.done();
-          refresh2.done();
+          const accessToken1 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          const accessToken2 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          const accessToken3 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          await Promise.all([accessToken1, accessToken2, accessToken3]);
+          refreshScope.done();
         });
 
         it("throws an error if the refresh fails", async () => {
