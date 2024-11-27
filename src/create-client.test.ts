@@ -8,6 +8,7 @@ import {
 } from "./create-client";
 import { LoginRequiredError, RefreshError } from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
+import { getClaims } from "./utils/session-data";
 import { storageKeys } from "./utils/storage-keys";
 import nock from "nock";
 
@@ -31,15 +32,20 @@ describe("create-client", () => {
     );
   });
 
-  const mockAccessToken = () =>
-    "." +
-    btoa(
-      JSON.stringify({
-        sid: "session_123abc",
-        iat: Date.now() / 1000,
-        exp: Date.now() / 1000 + 3600,
-      }),
-    );
+  interface MockAccessTokenClaims {
+    iat?: number;
+    exp?: number;
+    sid?: string;
+    jti?: string;
+  }
+
+  const mockAccessToken = ({
+    sid = "session_123abc",
+    iat = Date.now() / 1000,
+    exp = Date.now() / 1000 + 3600,
+    jti,
+  }: MockAccessTokenClaims = {}) =>
+    "." + btoa(JSON.stringify({ sid, iat, exp, jti }));
 
   describe("createClient", () => {
     describe("with no `clientId` provided", () => {
@@ -48,7 +54,7 @@ describe("create-client", () => {
       });
     });
 
-    describe("when the current route matches the redirect URI and has a `code`", () => {
+    describe("when the current route has a `code`", () => {
       describe("when no `codeVerifier` is present in session storage", () => {
         it("logs an error", async () => {
           jest.spyOn(console, "error").mockImplementation();
@@ -118,7 +124,12 @@ describe("create-client", () => {
   describe("Client", () => {
     function nockRefresh({
       currentRefreshToken = "refresh_token",
+      accessTokenClaims = {},
       devMode = false,
+    }: {
+      currentRefreshToken?: string;
+      accessTokenClaims?: MockAccessTokenClaims;
+      devMode?: boolean;
     } = {}) {
       const scope = nock("https://api.workos.com")
         .post("/user_management/authenticate", {
@@ -128,7 +139,7 @@ describe("create-client", () => {
         })
         .reply(200, {
           user: { id: "user_123abc" },
-          access_token: mockAccessToken(),
+          access_token: mockAccessToken(accessTokenClaims),
           refresh_token: "refresh_token",
         });
 
@@ -332,6 +343,84 @@ describe("create-client", () => {
           await expect(client.getAccessToken()).rejects.toThrow(
             LoginRequiredError,
           );
+          scope.done();
+        });
+      });
+
+      describe("when the current access token has expired", () => {
+        const clientWithExpiredAccessToken = async () => {
+          const now = Date.now();
+          const { scope: initialRefreshScope } = nockRefresh({
+            accessTokenClaims: {
+              iat: now,
+              // deliberately issuing a JWT that expires at the same time
+              // as iat (we don't trust the client's clock, so back-dating
+              // the timestamps doesn't do anything)
+              exp: now,
+              jti: "initial-access-token",
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            // turning off auto refresh so we can ensure that we're
+            // hitting the expired-access token case
+            onBeforeAutoRefresh: () => false,
+          });
+          initialRefreshScope.done();
+
+          return client;
+        };
+
+        it("gets a new access token and returns it", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          const { scope: refreshScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "refreshed-token",
+            },
+          });
+          const accessToken = await client.getAccessToken();
+          expect(getClaims(accessToken).jti).toEqual("refreshed-token");
+          refreshScope.done();
+        });
+
+        it("sends a request for each call", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          const { scope: refresh1 } = nockRefresh();
+          const { scope: refresh2 } = nockRefresh();
+
+          const accessToken1 = client.getAccessToken();
+          const accessToken2 = client.getAccessToken();
+          await Promise.all([accessToken1, accessToken2]);
+          refresh1.done();
+          refresh2.done();
+        });
+
+        it("throws an error if the refresh fails", async () => {
+          const consoleDebugSpy = jest
+            .spyOn(console, "debug")
+            .mockImplementation();
+          const client = await clientWithExpiredAccessToken();
+
+          const scope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(400, {
+              error: "invalid_grant",
+              error_description: "Session has already ended.",
+            });
+
+          await expect(client.getAccessToken()).rejects.toThrow(
+            LoginRequiredError,
+          );
+          expect(consoleDebugSpy.mock.calls).toEqual([
+            [expect.any(RefreshError)],
+          ]);
+
           scope.done();
         });
       });
