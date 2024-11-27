@@ -31,7 +31,11 @@ interface RedirectOptions {
   type: "sign-in" | "sign-up";
 }
 
-type State = "INITIAL" | "AUTHENTICATING" | "AUTHENTICATED" | "ERROR";
+type State =
+  | { tag: "INITIAL" }
+  | { tag: "AUTHENTICATING" }
+  | { tag: "AUTHENTICATED" }
+  | { tag: "ERROR" };
 
 const DEFAULT_HOSTNAME = "api.workos.com";
 
@@ -84,7 +88,7 @@ export class Client {
     this.#baseUrl = `${https ? "https" : "http"}://${apiHostname}${
       port ? `:${port}` : ""
     }`;
-    this.#state = "INITIAL";
+    this.#state = { tag: "INITIAL" };
     this.#onBeforeAutoRefresh = onBeforeAutoRefresh;
     this.#onRedirectCallback = onRedirectCallback;
     this.#onRefresh = onRefresh;
@@ -93,7 +97,7 @@ export class Client {
   }
 
   async initialize() {
-    if (this.#state !== "INITIAL") {
+    if (this.#state.tag !== "INITIAL") {
       return;
     }
 
@@ -159,7 +163,7 @@ export class Client {
   }
 
   async #handleCallback() {
-    if (this.#state !== "INITIAL") {
+    if (this.#state.tag !== "INITIAL") {
       return;
     }
 
@@ -167,7 +171,7 @@ export class Client {
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
     const state = stateParam ? JSON.parse(stateParam) : undefined;
-    this.#state = "AUTHENTICATING";
+    this.#state = { tag: "AUTHENTICATING" };
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(
@@ -186,18 +190,18 @@ export class Client {
           });
 
           if (authenticationResponse) {
-            this.#state = "AUTHENTICATED";
+            this.#state = { tag: "AUTHENTICATED" };
             this.#scheduleAutomaticRefresh();
             setSessionData(authenticationResponse, { devMode: this.#devMode });
             this.#onRefresh && this.#onRefresh(authenticationResponse);
             this.#onRedirectCallback({ state, ...authenticationResponse });
           }
         } catch (error) {
-          this.#state = "ERROR";
+          this.#state = { tag: "ERROR" };
           console.error(error);
         }
       } else {
-        this.#state = "ERROR";
+        this.#state = { tag: "ERROR" };
         console.error(`Couldn't exchange code.
 
 An authorization_code was supplied for a login which did not originate at the application. This could happen for various reasons:
@@ -255,7 +259,7 @@ An authorization_code was supplied for a login which did not originate at the ap
 
   async #refreshSession({ organizationId }: { organizationId?: string } = {}) {
     const beginningState = this.#state;
-    this.#state = "AUTHENTICATING";
+    this.#state = { tag: "AUTHENTICATING" };
 
     try {
       await withLock(REFRESH_LOCK_NAME, async () => {
@@ -283,7 +287,7 @@ An authorization_code was supplied for a login which did not originate at the ap
           useCookie: this.#useCookie,
         });
 
-        this.#state = "AUTHENTICATED";
+        this.#state = { tag: "AUTHENTICATED" };
         setSessionData(authenticationResponse, { devMode: this.#devMode });
         this.#onRefresh && this.#onRefresh(authenticationResponse);
       });
@@ -300,7 +304,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         return;
       }
 
-      if (beginningState !== "INITIAL") {
+      if (beginningState.tag !== "INITIAL") {
         console.debug(error);
       }
 
@@ -309,17 +313,17 @@ An authorization_code was supplied for a login which did not originate at the ap
         // fire the refresh failure UNLESS this is the initial refresh attempt
         // (the initial refresh is expected to fail if a user has not logged in
         // ever or recently)
-        beginningState !== "INITIAL" &&
+        beginningState.tag !== "INITIAL" &&
           this.#onRefreshFailure &&
           this.#onRefreshFailure({ signIn: this.signIn.bind(this) });
       }
-      this.#state = "ERROR";
+      this.#state = { tag: "ERROR" };
       throw error;
     }
   }
 
   #shouldRefresh() {
-    switch (this.#state) {
+    switch (this.#state.tag) {
       case "INITIAL":
       case "AUTHENTICATING":
         return true;
