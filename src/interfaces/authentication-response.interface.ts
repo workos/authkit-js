@@ -9,6 +9,8 @@ export interface AuthenticationResponse {
   impersonator?: Impersonator;
 }
 
+export type OnRefreshResponse = Omit<AuthenticationResponse, "refreshToken">;
+
 export interface AuthenticationResponseRaw {
   user: UserRaw;
   access_token: string;

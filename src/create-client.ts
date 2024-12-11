@@ -20,6 +20,7 @@ import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
 import { LoginRequiredError, RefreshError } from "./errors";
 import { withLock, LockError } from "./utils/locking";
+import { OnRefreshResponse } from "./interfaces/authentication-response.interface";
 
 interface RedirectOptions {
   context?: string;
@@ -53,7 +54,9 @@ export class Client {
   readonly #devMode: boolean;
   readonly #onBeforeAutoRefresh: () => boolean;
   readonly #onRedirectCallback: (params: RedirectParams) => void;
-  readonly #onRefresh: ((response: AuthenticationResponse) => void) | undefined;
+  readonly #onRefreshCallback:
+    | ((response: OnRefreshResponse) => void)
+    | undefined;
   readonly #onRefreshFailure:
     | ((params: { signIn: () => Promise<void> }) => void)
     | undefined;
@@ -91,7 +94,7 @@ export class Client {
     this.#state = { tag: "INITIAL" };
     this.#onBeforeAutoRefresh = onBeforeAutoRefresh;
     this.#onRedirectCallback = onRedirectCallback;
-    this.#onRefresh = onRefresh;
+    this.#onRefreshCallback = onRefresh;
     this.#onRefreshFailure = onRefreshFailure;
     this.#refreshBufferInterval = refreshBufferInterval;
   }
@@ -196,7 +199,7 @@ export class Client {
             this.#state = { tag: "AUTHENTICATED" };
             this.#scheduleAutomaticRefresh();
             setSessionData(authenticationResponse, { devMode: this.#devMode });
-            this.#onRefresh && this.#onRefresh(authenticationResponse);
+            this.#onRefresh(authenticationResponse);
             this.#onRedirectCallback({ state, ...authenticationResponse });
           }
         } catch (error) {
@@ -311,7 +314,7 @@ An authorization_code was supplied for a login which did not originate at the ap
 
         this.#state = { tag: "AUTHENTICATED" };
         setSessionData(authenticationResponse, { devMode: this.#devMode });
-        this.#onRefresh && this.#onRefresh(authenticationResponse);
+        this.#onRefresh(authenticationResponse);
         return authenticationResponse;
       });
     } catch (error) {
@@ -404,6 +407,15 @@ An authorization_code was supplied for a login which did not originate at the ap
 
   get #useCookie() {
     return !this.#devMode;
+  }
+
+  async #onRefresh(authenticationResponse: AuthenticationResponse) {
+    if (this.#onRefreshCallback) {
+      // there's no good reason for client code to access the refresh token
+      const { refreshToken: _refreshToken, ...onRefreshData } =
+        authenticationResponse;
+      this.#onRefreshCallback(onRefreshData);
+    }
   }
 }
 

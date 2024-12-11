@@ -37,6 +37,7 @@ describe("create-client", () => {
     exp?: number;
     sid?: string;
     jti?: string;
+    org_id?: string;
   }
 
   const mockAccessToken = ({
@@ -124,10 +125,12 @@ describe("create-client", () => {
   describe("Client", () => {
     function nockRefresh({
       currentRefreshToken = "refresh_token",
-      accessTokenClaims = {},
+      organizationId,
+      accessTokenClaims = { org_id: organizationId },
       devMode = false,
     }: {
       currentRefreshToken?: string;
+      organizationId?: string;
       accessTokenClaims?: MockAccessTokenClaims;
       devMode?: boolean;
     } = {}) {
@@ -139,6 +142,7 @@ describe("create-client", () => {
         })
         .reply(200, {
           user: { id: "user_123abc" },
+          organization_id: organizationId,
           access_token: mockAccessToken(accessTokenClaims),
           refresh_token: "refresh_token",
         });
@@ -310,6 +314,55 @@ describe("create-client", () => {
           expect(user).toBeNull();
           scope.done();
         });
+      });
+    });
+
+    describe("onRefresh", () => {
+      it("is called after a successful refresh", async () => {
+        const { scope } = nockRefresh({ organizationId: "org_abc" });
+
+        const onRefresh = jest.fn();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com",
+          onRefresh,
+        });
+
+        scope.done();
+
+        expect(onRefresh).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: {
+              id: "user_123abc",
+            },
+            organizationId: "org_abc",
+            accessToken: expect.stringMatching(/^.eyJ/),
+          }),
+        );
+      });
+
+      it("does not include the refresh token", async () => {
+        const { scope } = nockRefresh();
+
+        const onRefresh = jest.fn();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com",
+          onRefresh,
+        });
+
+        scope.done();
+
+        expect(onRefresh).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accessToken: expect.stringMatching(/^.eyJ/),
+          }),
+        );
+        expect(onRefresh).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            refreshToken: expect.stringContaining(""),
+          }),
+        );
       });
     });
 
