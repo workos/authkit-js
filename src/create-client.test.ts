@@ -19,6 +19,11 @@ describe("create-client", () => {
     sessionStorage.removeItem(storageKeys.codeVerifier);
     sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
     localStorage.removeItem(storageKeys.refreshToken);
+
+    // assume we have a session already for all these tests
+    jest
+      .spyOn(document, "cookie", "get")
+      .mockReturnValue(`workos-has-session=1`);
   });
 
   afterEach(() => {
