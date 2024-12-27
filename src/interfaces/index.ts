@@ -1,6 +1,7 @@
 export type {
   AuthenticationResponse,
   AuthenticationResponseRaw,
+  OnRefreshResponse,
 } from "./authentication-response.interface";
 export type { CreateClientOptions } from "./create-client-options.interface";
 export type { GetAuthorizationUrlOptions } from "./get-authorization-url-options.interface";

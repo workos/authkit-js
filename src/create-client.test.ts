@@ -2,9 +2,13 @@
  * @jest-environment-options {"url": "https://example.com/callback?code=code_123"}
  */
 
-import { createClient } from "./create-client";
+import {
+  createClient,
+  ORGANIZATION_ID_SESSION_STORAGE_KEY,
+} from "./create-client";
 import { LoginRequiredError, RefreshError } from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
+import { getClaims } from "./utils/session-data";
 import { storageKeys } from "./utils/storage-keys";
 import nock from "nock";
 
@@ -13,7 +17,13 @@ describe("create-client", () => {
 
   beforeEach(() => {
     sessionStorage.removeItem(storageKeys.codeVerifier);
+    sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
     localStorage.removeItem(storageKeys.refreshToken);
+
+    // assume we have a session already for all these tests
+    jest
+      .spyOn(document, "cookie", "get")
+      .mockReturnValue(`workos-has-session=1`);
   });
 
   afterEach(() => {
@@ -27,15 +37,21 @@ describe("create-client", () => {
     );
   });
 
-  const mockAccessToken = () =>
-    "." +
-    btoa(
-      JSON.stringify({
-        sid: "session_123abc",
-        iat: Date.now() / 1000,
-        exp: Date.now() / 1000 + 3600,
-      }),
-    );
+  interface MockAccessTokenClaims {
+    iat?: number;
+    exp?: number;
+    sid?: string;
+    jti?: string;
+    org_id?: string;
+  }
+
+  const mockAccessToken = ({
+    sid = "session_123abc",
+    iat = Date.now() / 1000,
+    exp = Date.now() / 1000 + 3600,
+    jti,
+  }: MockAccessTokenClaims = {}) =>
+    "." + btoa(JSON.stringify({ sid, iat, exp, jti }));
 
   describe("createClient", () => {
     describe("with no `clientId` provided", () => {
@@ -44,7 +60,7 @@ describe("create-client", () => {
       });
     });
 
-    describe("when the current route matches the redirect URI and has a `code`", () => {
+    describe("when the current route has a `code`", () => {
       describe("when no `codeVerifier` is present in session storage", () => {
         it("logs an error", async () => {
           jest.spyOn(console, "error").mockImplementation();
@@ -114,7 +130,14 @@ describe("create-client", () => {
   describe("Client", () => {
     function nockRefresh({
       currentRefreshToken = "refresh_token",
+      organizationId,
+      accessTokenClaims = { org_id: organizationId },
       devMode = false,
+    }: {
+      currentRefreshToken?: string;
+      organizationId?: string;
+      accessTokenClaims?: MockAccessTokenClaims;
+      devMode?: boolean;
     } = {}) {
       const scope = nock("https://api.workos.com")
         .post("/user_management/authenticate", {
@@ -124,7 +147,8 @@ describe("create-client", () => {
         })
         .reply(200, {
           user: { id: "user_123abc" },
-          access_token: mockAccessToken(),
+          organization_id: organizationId,
+          access_token: mockAccessToken(accessTokenClaims),
           refresh_token: "refresh_token",
         });
 
@@ -280,9 +304,6 @@ describe("create-client", () => {
 
       describe("when the current session is not authenticated", () => {
         it("returns `null`", async () => {
-          const consoleErrorSpy = jest
-            .spyOn(console, "error")
-            .mockImplementation();
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
               client_id: "client_123abc",
@@ -296,11 +317,57 @@ describe("create-client", () => {
           const user = client.getUser();
 
           expect(user).toBeNull();
-          expect(consoleErrorSpy.mock.calls).toEqual([
-            [expect.any(RefreshError)],
-          ]);
           scope.done();
         });
+      });
+    });
+
+    describe("onRefresh", () => {
+      it("is called after a successful refresh", async () => {
+        const { scope } = nockRefresh({ organizationId: "org_abc" });
+
+        const onRefresh = jest.fn();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com",
+          onRefresh,
+        });
+
+        scope.done();
+
+        expect(onRefresh).toHaveBeenCalledWith(
+          expect.objectContaining({
+            user: {
+              id: "user_123abc",
+            },
+            organizationId: "org_abc",
+            accessToken: expect.stringMatching(/^.eyJ/),
+          }),
+        );
+      });
+
+      it("does not include the refresh token", async () => {
+        const { scope } = nockRefresh();
+
+        const onRefresh = jest.fn();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com",
+          onRefresh,
+        });
+
+        scope.done();
+
+        expect(onRefresh).toHaveBeenCalledWith(
+          expect.objectContaining({
+            accessToken: expect.stringMatching(/^.eyJ/),
+          }),
+        );
+        expect(onRefresh).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            refreshToken: expect.stringContaining(""),
+          }),
+        );
       });
     });
 
@@ -321,9 +388,6 @@ describe("create-client", () => {
 
       describe("when the current session is not authenticated", () => {
         it("throws a `LoginRequiredError`", async () => {
-          const consoleErrorSpy = jest
-            .spyOn(console, "error")
-            .mockImplementation();
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
               client_id: "client_123abc",
@@ -337,11 +401,150 @@ describe("create-client", () => {
           await expect(client.getAccessToken()).rejects.toThrow(
             LoginRequiredError,
           );
+          scope.done();
+        });
+      });
 
-          expect(consoleErrorSpy.mock.calls).toEqual([
+      describe("when the current access token has expired", () => {
+        const clientWithExpiredAccessToken = async () => {
+          const now = Date.now();
+          const { scope: initialRefreshScope } = nockRefresh({
+            accessTokenClaims: {
+              iat: now,
+              // deliberately issuing a JWT that expires at the same time
+              // as iat (we don't trust the client's clock, so back-dating
+              // the timestamps doesn't do anything)
+              exp: now,
+              jti: "initial-access-token",
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            // turning off auto refresh so we can ensure that we're
+            // hitting the expired-access token case
+            onBeforeAutoRefresh: () => false,
+          });
+          initialRefreshScope.done();
+
+          return client;
+        };
+
+        it("gets a new access token and returns it", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          const { scope: refreshScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "refreshed-token",
+            },
+          });
+          const accessToken = await client.getAccessToken();
+          expect(getClaims(accessToken).jti).toEqual("refreshed-token");
+          refreshScope.done();
+        });
+
+        it("only issues one request for multiple calls", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          const { scope: refreshScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "refreshed-token",
+            },
+          });
+
+          const accessToken1 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          const accessToken2 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          const accessToken3 = client.getAccessToken().then((token) => {
+            expect(getClaims(token).jti).toEqual("refreshed-token");
+          });
+          await Promise.all([accessToken1, accessToken2, accessToken3]);
+          refreshScope.done();
+        });
+
+        it("throws an error if the refresh fails", async () => {
+          const consoleDebugSpy = jest
+            .spyOn(console, "debug")
+            .mockImplementation();
+          const client = await clientWithExpiredAccessToken();
+
+          const scope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(400, {
+              error: "invalid_grant",
+              error_description: "Session has already ended.",
+            });
+
+          await expect(client.getAccessToken()).rejects.toThrow(
+            LoginRequiredError,
+          );
+          expect(consoleDebugSpy.mock.calls).toEqual([
             [expect.any(RefreshError)],
           ]);
+
           scope.done();
+        });
+      });
+    });
+
+    describe("switchToOrganization", () => {
+      it("refreshes the session with the given organization ID", async () => {
+        const { scope: createClientScope } = nockRefresh();
+        const organizationId = "org_123abc";
+        const switchToOrgScope = nock("https://api.workos.com")
+          .post("/user_management/authenticate", {
+            client_id: "client_123abc",
+            grant_type: "refresh_token",
+            organization_id: organizationId,
+          })
+          .reply(200, {
+            user: {},
+            access_token: mockAccessToken(),
+            refresh_token: "refresh_token",
+            organization_id: organizationId,
+          });
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+
+        await client.switchToOrganization({ organizationId });
+        createClientScope.done();
+        switchToOrgScope.done();
+      });
+
+      it("redirects to the AuthKit sign-in page if the refresh fails", async () => {
+        const { scope: createClientScope } = nockRefresh();
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        createClientScope.done();
+
+        const organizationId = "org_123abc";
+        const switchToOrgScope = nock("https://api.workos.com")
+          .post("/user_management/authenticate", {
+            client_id: "client_123abc",
+            grant_type: "refresh_token",
+            organization_id: organizationId,
+          })
+          .reply(401, {});
+        const signInSpy = jest.spyOn(client, "signIn").mockImplementation();
+        jest.spyOn(console, "debug").mockImplementation();
+
+        await client.switchToOrganization({
+          organizationId,
+          signInOpts: { state: { returnTo: "/somewhere" } },
+        });
+        switchToOrgScope.done();
+
+        expect(signInSpy).toHaveBeenCalledWith({
+          organizationId: "org_123abc",
+          state: { returnTo: "/somewhere" },
         });
       });
     });
