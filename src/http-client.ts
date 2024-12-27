@@ -1,4 +1,4 @@
-import { RefreshError } from "./errors";
+import { CodeExchangeError, RefreshError } from "./errors";
 import {
   AuthenticationResponseRaw,
   GetAuthorizationUrlOptions,
@@ -79,9 +79,10 @@ export class HttpClient {
     if (response.ok) {
       const data = (await response.json()) as AuthenticationResponseRaw;
       return deserializeAuthenticationResponse(data);
-    } else {
-      console.log("error", await response.json());
     }
+
+    const error = await response.json();
+    throw new CodeExchangeError(error.error_description);
   }
 
   #post(

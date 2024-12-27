@@ -1,6 +1,7 @@
 import {
   AuthenticationResponse,
   CreateClientOptions,
+  OnRefreshResponse,
   User,
 } from "./interfaces";
 import { NoClientIdProvidedException } from "./exceptions";
