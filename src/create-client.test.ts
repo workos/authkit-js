@@ -372,6 +372,30 @@ describe("create-client", () => {
     });
 
     describe("getAccessToken", () => {
+      const clientWithExpiredAccessToken = async () => {
+        const now = Date.now();
+        const { scope: initialRefreshScope } = nockRefresh({
+          accessTokenClaims: {
+            iat: now,
+            // deliberately issuing a JWT that expires at the same time
+            // as iat (we don't trust the client's clock, so back-dating
+            // the timestamps doesn't do anything)
+            exp: now,
+            jti: "initial-access-token",
+          },
+        });
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+          // turning off auto refresh so we can ensure that we're
+          // hitting the expired-access token case
+          onBeforeAutoRefresh: () => false,
+        });
+        initialRefreshScope.done();
+
+        return client;
+      };
+
       describe("when the current session is authenticated", () => {
         it("returns the access token", async () => {
           const { scope } = nockRefresh();
@@ -388,6 +412,11 @@ describe("create-client", () => {
 
       describe("when the current session is not authenticated", () => {
         it("throws a `LoginRequiredError`", async () => {
+          const consoleDebugSpy = jest
+            .spyOn(console, "debug")
+            .mockImplementation();
+          client = await clientWithExpiredAccessToken();
+
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
               client_id: "client_123abc",
@@ -395,9 +424,6 @@ describe("create-client", () => {
             })
             .reply(401, {});
 
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-          });
           await expect(client.getAccessToken()).rejects.toThrow(
             LoginRequiredError,
           );
@@ -406,30 +432,6 @@ describe("create-client", () => {
       });
 
       describe("when the current access token has expired", () => {
-        const clientWithExpiredAccessToken = async () => {
-          const now = Date.now();
-          const { scope: initialRefreshScope } = nockRefresh({
-            accessTokenClaims: {
-              iat: now,
-              // deliberately issuing a JWT that expires at the same time
-              // as iat (we don't trust the client's clock, so back-dating
-              // the timestamps doesn't do anything)
-              exp: now,
-              jti: "initial-access-token",
-            },
-          });
-
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-            // turning off auto refresh so we can ensure that we're
-            // hitting the expired-access token case
-            onBeforeAutoRefresh: () => false,
-          });
-          initialRefreshScope.done();
-
-          return client;
-        };
-
         it("gets a new access token and returns it", async () => {
           const client = await clientWithExpiredAccessToken();
 
@@ -489,6 +491,34 @@ describe("create-client", () => {
           ]);
 
           scope.done();
+        });
+
+        it("throws an error if the fetch fails", async () => {
+          const consoleDebugSpy = jest
+            .spyOn(console, "debug")
+            .mockImplementation();
+          const client = await clientWithExpiredAccessToken();
+
+          const errorScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .times(2)
+            .replyWithError(new TypeError("Network Error"));
+
+          await expect(client.getAccessToken()).rejects.toThrow(TypeError);
+          await expect(client.getAccessToken()).rejects.toThrow(TypeError);
+          expect(consoleDebugSpy.mock.calls).toEqual([
+            [expect.any(TypeError)],
+            [expect.any(TypeError)],
+          ]);
+          errorScope.done();
+
+          const { scope: successScope } = nockRefresh();
+          const accessToken = await client.getAccessToken();
+          expect(accessToken).toMatch(/^.eyJ/);
+          successScope.done();
         });
       });
     });
