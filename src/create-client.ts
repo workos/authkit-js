@@ -334,8 +334,16 @@ An authorization_code was supplied for a login which did not originate at the ap
         beginningState.tag !== "INITIAL" &&
           this.#onRefreshFailure &&
           this.#onRefreshFailure({ signIn: this.signIn.bind(this) });
+
+        this.#state = { tag: "ERROR" };
+      } else {
+        // transitioning into the AUTHENTICATED state ensures that we will
+        // attempt to refresh the token on future getAccessToken calls()
+        //
+        // this could maybe be a new state for clarity? TEMPORARY_ERROR?
+        this.#state = { tag: "AUTHENTICATED" };
       }
-      this.#state = { tag: "ERROR" };
+
       throw error;
     }
   }
