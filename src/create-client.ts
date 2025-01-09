@@ -98,7 +98,10 @@ export class Client {
     const searchParams = new URLSearchParams(window.location.search);
     if (isRedirectCallback(this.#redirectUri, searchParams)) {
       await this.#handleCallback();
-    } else if (document.cookie.includes("workos-has-session=")) {
+    } else if (
+      document.cookie.includes("workos-has-session=") ||
+      getRefreshToken({ devMode: this.#devMode })
+    ) {
       try {
         await this.#refreshSession();
         this.#scheduleAutomaticRefresh();
