@@ -14,6 +14,7 @@ import nock from "nock";
 
 describe("create-client", () => {
   let client: Awaited<ReturnType<typeof createClient>>;
+  let cookieMock: jest.SpyInstance;
 
   beforeEach(() => {
     sessionStorage.removeItem(storageKeys.codeVerifier);
@@ -21,7 +22,7 @@ describe("create-client", () => {
     localStorage.removeItem(storageKeys.refreshToken);
 
     // assume we have a session already for all these tests
-    jest
+    cookieMock = jest
       .spyOn(document, "cookie", "get")
       .mockReturnValue(`workos-has-session=1`);
   });
@@ -35,6 +36,8 @@ describe("create-client", () => {
       "",
       "https://example.com/callback?code=code_123",
     );
+
+    nock.cleanAll();
   });
 
   interface MockAccessTokenClaims {
@@ -105,24 +108,108 @@ describe("create-client", () => {
       });
     });
 
-    describe("when the current route does not match the redirect URI", () => {
-      it("refreshes the existing session", async () => {
-        const nockScope = nock("https://api.workos.com")
-          .post("/user_management/authenticate", {
-            client_id: "client_123abc",
-            grant_type: "refresh_token",
-          })
-          .reply(200, {
-            user: {},
-            access_token: mockAccessToken(),
-            refresh_token: "refresh_token",
+    describe("when the current route does not have a `code`", () => {
+      describe("when there is a `workos-has-session cookie", () => {
+        it("refreshes the existing session", async () => {
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            devMode: false,
+            redirectUri: "https://example.com/",
           });
 
-        client = await createClient("client_123abc", {
-          redirectUri: "https://example.com/",
+          nockScope.done();
+        });
+      });
+
+      describe("when devMode is true", () => {
+        it("refreshes when a refresh token is available", async () => {
+          localStorage.setItem(
+            "workos:refresh-token",
+            "this-is-a-refresh-token",
+          );
+          cookieMock.mockRestore();
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+              refresh_token: "this-is-a-refresh-token",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            devMode: true,
+            redirectUri: "https://example.com/",
+          });
+
+          nockScope.done();
         });
 
-        nockScope.done();
+        it("does not refresh otherwise", async () => {
+          cookieMock.mockRestore();
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+              refresh_token: "no-refresh-token-is-set",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            devMode: true,
+            redirectUri: "https://example.com/",
+          });
+
+          // verify no network requests were made
+          expect(nockScope.isDone()).toBe(false);
+
+          // client should still be created successfully
+          expect(client).toBeDefined();
+        });
+      });
+
+      describe("otherwise", () => {
+        it("does nothing", async () => {
+          cookieMock.mockRestore();
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            devMode: false,
+            redirectUri: "https://example.com/",
+          });
+
+          // verify no network requests were made
+          expect(nockScope.isDone()).toBe(false);
+
+          // client should still be created successfully
+          expect(client).toBeDefined();
+        });
       });
     });
   });
