@@ -38,9 +38,28 @@ describe("HttpClient", () => {
 
   describe("getLogoutUrl", () => {
     it("returns the logout URL with the given `baseUrl`", () => {
-      expect(httpClient.getLogoutUrl("123").toString()).toBe(
-        "https://api.workos.com/user_management/sessions/logout?session_id=123",
+      expect(
+        httpClient
+          .getLogoutUrl({ sessionId: "session_123abc", returnTo: undefined })
+          .toString(),
+      ).toBe(
+        "https://api.workos.com/user_management/sessions/logout?session_id=session_123abc",
       );
+    });
+
+    describe("when `returnTo` is provided", () => {
+      it("includes the `returnTo` query parameter", () => {
+        expect(
+          httpClient
+            .getLogoutUrl({
+              sessionId: "session_123abc",
+              returnTo: "https://example.com",
+            })
+            .toString(),
+        ).toBe(
+          "https://api.workos.com/user_management/sessions/logout?session_id=session_123abc&return_to=https%3A%2F%2Fexample.com",
+        );
+      });
     });
   });
 });

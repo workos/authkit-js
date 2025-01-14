@@ -120,12 +120,15 @@ export class Client {
     return this.#redirect({ ...opts, type: "sign-up" });
   }
 
-  signOut(): void {
+  signOut(options?: { returnTo: string }): void {
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") return;
     const { sid: sessionId } = getClaims(accessToken);
 
-    const url = this.#httpClient.getLogoutUrl(sessionId);
+    const url = this.#httpClient.getLogoutUrl({
+      sessionId,
+      returnTo: options?.returnTo,
+    });
 
     if (url) {
       removeSessionData({ devMode: this.#devMode });
