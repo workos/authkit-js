@@ -357,6 +357,33 @@ describe("create-client", () => {
         scope.done();
       });
 
+      describe("when the `returnTo` option is provided", () => {
+        it("includes the `returnTo` query parameter", async () => {
+          const { scope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+          client.signOut({ returnTo: "https://example.com" });
+
+          const newUrl = new URL(jest.mocked(location.assign).mock.calls[0][0]);
+          expect({
+            newUrl,
+            searchParams: Object.fromEntries(newUrl.searchParams.entries()),
+          }).toEqual({
+            newUrl: expect.objectContaining({
+              origin: "https://api.workos.com",
+              pathname: "/user_management/sessions/logout",
+            }),
+            searchParams: {
+              session_id: "session_123abc",
+              return_to: "https://example.com",
+            },
+          });
+          scope.done();
+        });
+      });
+
       describe("when tokens are persisted in local storage in development", () => {
         it("clears the tokens", async () => {
           localStorage.setItem(storageKeys.refreshToken, "refresh_token");

@@ -148,10 +148,19 @@ export class HttpClient {
     return `${this.#baseUrl}/user_management/authorize?${query}`;
   }
 
-  getLogoutUrl(sessionId: string) {
+  getLogoutUrl({
+    sessionId,
+    returnTo,
+  }: {
+    sessionId: string;
+    returnTo: string | undefined;
+  }) {
     const url = new URL("/user_management/sessions/logout", this.#baseUrl);
 
     url.searchParams.set("session_id", sessionId);
+    if (returnTo) {
+      url.searchParams.set("return_to", returnTo);
+    }
 
     return url;
   }
