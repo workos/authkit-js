@@ -17,7 +17,3 @@ const authkit = await createClient("your-client-id");
 const user = authkit.getUser();
 const accessToken = await authkit.getAccessToken();
 ```
-
-## Impersonation support is coming soon
-
-Impersonation is not currently supported in authkit-js. We are targeting EOY 2024.
