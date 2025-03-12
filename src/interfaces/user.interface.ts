@@ -7,6 +7,7 @@ export interface User {
   firstName: string | null;
   lastName: string | null;
   lastSignInAt: string | null;
+  externalId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +21,7 @@ export interface UserRaw {
   first_name: string | null;
   last_name: string | null;
   last_sign_in_at: string | null;
+  external_id?: string;
   created_at: string;
   updated_at: string;
 }
