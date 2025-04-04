@@ -232,7 +232,7 @@ An authorization_code was supplied for a login which did not originate at the ap
           .catch((e) => {
             console.debug(e);
           })
-          .then(() => this.#scheduleAutomaticRefresh);
+          .finally(() => this.#scheduleAutomaticRefresh())
       } else {
         this.#scheduleAutomaticRefresh();
       }
