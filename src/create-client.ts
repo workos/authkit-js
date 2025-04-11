@@ -213,8 +213,7 @@ export class Client {
 An authorization_code was supplied for a login which did not originate at the application. This could happen for various reasons:
 
 * This could have been an attempted Login CSRF attack. You were not affected.
-* The developer may not have configured a Login Initiation endpoint.
-* Was this an Impersonation attempt? Impersonation support is coming soon.`);
+* The developer may not have configured a Login Initiation endpoint.`);
       }
     }
 
@@ -232,7 +231,7 @@ An authorization_code was supplied for a login which did not originate at the ap
           .catch((e) => {
             console.debug(e);
           })
-          .finally(() => this.#scheduleAutomaticRefresh())
+          .finally(() => this.#scheduleAutomaticRefresh());
       } else {
         this.#scheduleAutomaticRefresh();
       }
