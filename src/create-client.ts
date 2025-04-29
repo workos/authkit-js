@@ -20,6 +20,10 @@ import { withLock, LockError } from "./utils/locking";
 import { HttpClient } from "./http-client";
 
 interface RedirectOptions {
+  /**
+   *  @deprecated We previously required initiate login endpoints to return the `context`
+   *  query parameter when getting the authorization URL. This is no longer necessary.
+   */
   context?: string;
   invitationToken?: string;
   loginHint?: string;
