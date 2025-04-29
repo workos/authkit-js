@@ -1,5 +1,9 @@
 export interface GetAuthorizationUrlOptions {
   connectionId?: string;
+  /**
+   *  @deprecated We previously required initiate login endpoints to return the `context`
+   *  query parameter when getting the authorization URL. This is no longer necessary.
+   */
   context?: string;
   organizationId?: string;
   domainHint?: string;
