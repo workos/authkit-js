@@ -136,7 +136,7 @@ export class Client {
     window.location.assign(url);
   }
 
-  signOut(options?: { returnTo: string }): void {
+  signOut(options?: { returnTo?: string, noRedirect?: boolean }): void {
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") return;
     const { sid: sessionId } = getClaims(accessToken);
@@ -148,7 +148,11 @@ export class Client {
 
     if (url) {
       removeSessionData({ devMode: this.#devMode });
-      window.location.assign(url);
+      if (options?.noRedirect) {
+        fetch(url)
+      } else {
+        window.location.assign(url);
+      }
     }
   }
 
