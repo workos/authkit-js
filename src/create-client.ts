@@ -115,13 +115,25 @@ export class Client {
       }
     }
   }
+  
+  async getSignInUrl(opts: Omit<RedirectOptions, "type"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+    return url
+  }
 
+  async getSignUpUrl(opts: Omit<RedirectOptions, "type"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+    return url
+  }
+  
   async signIn(opts: Omit<RedirectOptions, "type"> = {}) {
-    return this.#redirect({ ...opts, type: "sign-in" });
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+    window.location.assign(url);
   }
 
   async signUp(opts: Omit<RedirectOptions, "type"> = {}) {
-    return this.#redirect({ ...opts, type: "sign-up" });
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+    window.location.assign(url);
   }
 
   signOut(options?: { returnTo: string }): void {
@@ -382,7 +394,7 @@ An authorization_code was supplied for a login which did not originate at the ap
     }
   }
 
-  async #redirect({
+  async #getAuthorizationUrl({
     context,
     invitationToken,
     loginHint,
@@ -407,7 +419,7 @@ An authorization_code was supplied for a login which did not originate at the ap
       state: state ? JSON.stringify(state) : undefined,
     });
 
-    window.location.assign(url);
+    return url
   }
 
   #getAccessToken() {
