@@ -326,6 +326,94 @@ describe("create-client", () => {
       });
     });
 
+    describe("getSignInUrl", () => {
+      beforeEach(() => {
+        mockLocation();
+      });
+
+      afterEach(() => {
+        restoreLocation();
+      });
+
+      it("generates a PKCE challenge and returns the AuthKit sign-in page URL", async () => {
+        const { scope } = nockRefresh();
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        const signInUrl = await client.getSignInUrl();
+        const url = new URL(signInUrl);
+
+        // Location.assign should not be called
+        expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        expect({
+          url,
+          searchParams: Object.fromEntries(url.searchParams.entries()),
+        }).toEqual({
+          url: expect.objectContaining({
+            origin: "https://api.workos.com",
+            pathname: "/user_management/authorize",
+          }),
+          searchParams: {
+            client_id: "client_123abc",
+            code_challenge: expect.any(String),
+            code_challenge_method: "S256",
+            provider: "authkit",
+            redirect_uri: "https://example.com/",
+            response_type: "code",
+            screen_hint: "sign-in",
+          },
+        });
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();
+        scope.done();
+      });
+    });
+
+    describe("getSignUpUrl", () => {
+      beforeEach(() => {
+        mockLocation();
+      });
+
+      afterEach(() => {
+        restoreLocation();
+      });
+
+      it("generates a PKCE challenge and returns the AuthKit sign-up page URL", async () => {
+        const { scope } = nockRefresh();
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        const signUpUrl = await client.getSignUpUrl();
+        const url = new URL(signUpUrl);
+
+        // Location.assign should not be called
+        expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        expect({
+          url,
+          searchParams: Object.fromEntries(url.searchParams.entries()),
+        }).toEqual({
+          url: expect.objectContaining({
+            origin: "https://api.workos.com",
+            pathname: "/user_management/authorize",
+          }),
+          searchParams: {
+            client_id: "client_123abc",
+            code_challenge: expect.any(String),
+            code_challenge_method: "S256",
+            provider: "authkit",
+            redirect_uri: "https://example.com/",
+            response_type: "code",
+            screen_hint: "sign-up",
+          },
+        });
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();
+        scope.done();
+      });
+    });
+
     describe("signOut", () => {
       beforeEach(() => {
         mockLocation();
