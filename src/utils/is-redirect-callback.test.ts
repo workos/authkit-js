@@ -16,10 +16,15 @@ describe("isRedirectCallback", () => {
 
   describe('when the given redirect URI ends with a "/"', () => {
     it("returns true when the current location otherwise matches without the slash", () => {
+      const originalPath = window.location.pathname;
+      window.history.replaceState({}, "", "/callback/");
+      
       const redirectUri = "https://example.com/callback";
       const searchParams = new URLSearchParams(Object.entries({ code: "123" }));
 
       const result = isRedirectCallback(redirectUri, searchParams);
+
+      window.history.replaceState({}, "", originalPath);
 
       expect(result).toBe(true);
     });
