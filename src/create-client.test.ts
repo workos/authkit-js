@@ -472,6 +472,89 @@ describe("create-client", () => {
         });
       });
 
+      describe("when the `noRedirect` option is provided", () => {
+        it("makes a fetch request instead of redirecting", async () => {
+          const { scope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          const originalFetch = global.fetch;
+          const mockFetch = jest.fn().mockResolvedValue({
+            ok: true,
+          });
+          global.fetch = mockFetch;
+
+          try {
+            await client.signOut({ noRedirect: true });
+
+            // Location.assign should not be called
+            expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+
+            // Fetch should be called with the correct URL
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            const fetchUrl = new URL(mockFetch.mock.calls[0][0]);
+            expect({
+              fetchUrl,
+              searchParams: Object.fromEntries(fetchUrl.searchParams.entries()),
+            }).toEqual({
+              fetchUrl: expect.objectContaining({
+                origin: "https://api.workos.com",
+                pathname: "/user_management/sessions/logout",
+              }),
+              searchParams: { session_id: "session_123abc" },
+            });
+            scope.done();
+          } finally {
+            global.fetch = originalFetch;
+          }
+        });
+
+        it("includes the `returnTo` parameter", async () => {
+          const { scope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          const originalFetch = global.fetch;
+          const mockFetch = jest.fn().mockResolvedValue({
+            ok: true,
+          });
+          global.fetch = mockFetch;
+
+          try {
+            await client.signOut({ returnTo: "https://example.com", noRedirect: true });
+
+            // Location.assign should not be called
+            expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            const fetchUrl = new URL(mockFetch.mock.calls[0][0]);
+            expect({
+              fetchUrl,
+              searchParams: Object.fromEntries(fetchUrl.searchParams.entries()),
+            }).toEqual({
+              fetchUrl: expect.objectContaining({
+                origin: "https://api.workos.com",
+                pathname: "/user_management/sessions/logout",
+              }),
+              searchParams: {
+                session_id: "session_123abc",
+                return_to: "https://example.com",
+              },
+            });
+
+            scope.done();
+          } finally {
+            global.fetch = originalFetch;
+          }
+        });
+      });
+
       describe("when tokens are persisted in local storage in development", () => {
         it("clears the tokens", async () => {
           localStorage.setItem(storageKeys.refreshToken, "refresh_token");
@@ -485,6 +568,48 @@ describe("create-client", () => {
 
           expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
           scope.done();
+        });
+
+        describe("when `returnTo` is provided", () => {
+          it("clears the tokens", async () => {
+            localStorage.setItem(storageKeys.refreshToken, "refresh_token");
+            const { scope } = nockRefresh({ devMode: true });
+
+            client = await createClient("client_123abc", {
+              redirectUri: "https://example.com/",
+              devMode: true,
+            });
+            client.signOut({ returnTo: "https://example.com" });
+
+            expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
+            scope.done();
+          });
+        });
+
+        describe("when `noRedirect` is true", () => {
+          it("clears the tokens", async () => {
+            localStorage.setItem(storageKeys.refreshToken, "refresh_token");
+            const { scope } = nockRefresh({ devMode: true });
+
+            client = await createClient("client_123abc", {
+              redirectUri: "https://example.com/",
+              devMode: true,
+            });
+
+            const originalFetch = global.fetch;
+            const mockFetch = jest.fn().mockResolvedValue({
+              ok: true,
+            });
+            global.fetch = mockFetch;
+
+            try {
+              await client.signOut({ noRedirect: true });
+              expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
+              scope.done();
+            } finally {
+              global.fetch = originalFetch;
+            }
+          });
         });
       });
     });
