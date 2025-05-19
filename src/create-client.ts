@@ -115,17 +115,17 @@ export class Client {
       }
     }
   }
-  
+
   async getSignInUrl(opts: Omit<RedirectOptions, "type"> = {}) {
     const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
-    return url
+    return url;
   }
 
   async getSignUpUrl(opts: Omit<RedirectOptions, "type"> = {}) {
     const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
-    return url
+    return url;
   }
-  
+
   async signIn(opts: Omit<RedirectOptions, "type"> = {}) {
     const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
     window.location.assign(url);
@@ -136,7 +136,7 @@ export class Client {
     window.location.assign(url);
   }
 
-  signOut(options?: { returnTo?: string, noRedirect?: boolean }): void {
+  signOut(options?: { returnTo?: string; noRedirect?: boolean }): void {
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") return;
     const { sid: sessionId } = getClaims(accessToken);
@@ -149,7 +149,7 @@ export class Client {
     if (url) {
       removeSessionData({ devMode: this.#devMode });
       if (options?.noRedirect) {
-        fetch(url)
+        fetch(url);
       } else {
         window.location.assign(url);
       }
@@ -423,7 +423,7 @@ An authorization_code was supplied for a login which did not originate at the ap
       state: state ? JSON.stringify(state) : undefined,
     });
 
-    return url
+    return url;
   }
 
   #getAccessToken() {

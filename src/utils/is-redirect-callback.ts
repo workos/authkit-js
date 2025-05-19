@@ -7,5 +7,8 @@ export function isRedirectCallback(
 
   const { pathname: currentPathName } = window.location;
   const redirectPathname = new URL(redirectUri).pathname;
-  return currentPathName === redirectPathname || currentPathName === `${redirectPathname}/`;
+  return (
+    currentPathName === redirectPathname ||
+    currentPathName === `${redirectPathname}/`
+  );
 }

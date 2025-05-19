@@ -526,7 +526,10 @@ describe("create-client", () => {
           global.fetch = mockFetch;
 
           try {
-            await client.signOut({ returnTo: "https://example.com", noRedirect: true });
+            await client.signOut({
+              returnTo: "https://example.com",
+              noRedirect: true,
+            });
 
             // Location.assign should not be called
             expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
