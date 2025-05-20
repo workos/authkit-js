@@ -140,8 +140,8 @@ export class Client {
     }
   }
 
-  async getAccessToken(): Promise<string> {
-    if (this.#shouldRefresh()) {
+  async getAccessToken(options?: { forceRefresh?: boolean }): Promise<string> {
+    if (options?.forceRefresh || this.#shouldRefresh()) {
       try {
         await this.#refreshSession();
       } catch (err) {

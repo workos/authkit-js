@@ -522,6 +522,38 @@ describe("create-client", () => {
           expect(accessToken).toEqual(expect.stringMatching(/\.eyJ/));
           scope.done();
         });
+
+        it("refreshes the access token when forceRefresh is true", async () => {
+          // First create a client with a valid (non-expired) token
+          const { scope: initialScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "initial-token",
+              // Set future expiration
+              exp: Date.now() / 1000 + 3600,
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+          initialScope.done();
+
+          // Setup a refresh response for the forced refresh
+          const { scope: refreshScope } = nockRefresh({
+            accessTokenClaims: {
+              jti: "forced-refresh-token",
+            },
+          });
+
+          // Get the token with forceRefresh: true
+          const accessToken = await client.getAccessToken({
+            forceRefresh: true,
+          });
+
+          // Verify the token was refreshed
+          expect(getClaims(accessToken).jti).toEqual("forced-refresh-token");
+          refreshScope.done();
+        });
       });
 
       describe("when the current session is not authenticated", () => {
