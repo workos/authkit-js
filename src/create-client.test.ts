@@ -487,7 +487,7 @@ describe("create-client", () => {
           global.fetch = mockFetch;
 
           try {
-            await client.signOut({ noRedirect: true });
+            await client.signOut({ navigate: false });
 
             // Location.assign should not be called
             expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
@@ -528,7 +528,7 @@ describe("create-client", () => {
           try {
             await client.signOut({
               returnTo: "https://example.com",
-              noRedirect: true,
+              navigate: false,
             });
 
             // Location.assign should not be called
@@ -606,7 +606,7 @@ describe("create-client", () => {
             global.fetch = mockFetch;
 
             try {
-              await client.signOut({ noRedirect: true });
+              await client.signOut({ navigate: false });
               expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
               scope.done();
             } finally {
