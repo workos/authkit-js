@@ -116,15 +116,32 @@ export class Client {
     }
   }
 
+  async getSignInUrl(opts: Omit<RedirectOptions, "type"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+    return url;
+  }
+
+  async getSignUpUrl(opts: Omit<RedirectOptions, "type"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+    return url;
+  }
+
   async signIn(opts: Omit<RedirectOptions, "type"> = {}) {
-    return this.#redirect({ ...opts, type: "sign-in" });
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+    window.location.assign(url);
   }
 
   async signUp(opts: Omit<RedirectOptions, "type"> = {}) {
-    return this.#redirect({ ...opts, type: "sign-up" });
+    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+    window.location.assign(url);
   }
 
-  signOut(options?: { returnTo: string }): void {
+  signOut(options?: { returnTo?: string; navigate?: true }): void;
+  signOut(options?: { returnTo?: string; navigate: false }): Promise<void>;
+  signOut(
+    options: { returnTo?: string; navigate?: boolean } = { navigate: true },
+  ): void | Promise<void> {
+    const navigate = options.navigate ?? true;
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") return;
     const { sid: sessionId } = getClaims(accessToken);
@@ -136,7 +153,21 @@ export class Client {
 
     if (url) {
       removeSessionData({ devMode: this.#devMode });
-      window.location.assign(url);
+
+      if (navigate) {
+        window.location.assign(url);
+      } else {
+        return new Promise(async (resolve) => {
+          fetch(url, {
+            mode: "no-cors",
+            credentials: "include",
+          })
+            .catch((error) => {
+              console.warn("AuthKit: Failed to send logout request", error);
+            })
+            .finally(resolve);
+        });
+      }
     }
   }
 
@@ -382,7 +413,7 @@ An authorization_code was supplied for a login which did not originate at the ap
     }
   }
 
-  async #redirect({
+  async #getAuthorizationUrl({
     context,
     invitationToken,
     loginHint,
@@ -407,7 +438,7 @@ An authorization_code was supplied for a login which did not originate at the ap
       state: state ? JSON.stringify(state) : undefined,
     });
 
-    window.location.assign(url);
+    return url;
   }
 
   #getAccessToken() {

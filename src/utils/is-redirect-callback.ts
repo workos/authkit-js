@@ -5,7 +5,10 @@ export function isRedirectCallback(
   const hasCode = searchParams.has("code");
   if (!hasCode) return false;
 
-  const { protocol, host, pathname } = window.location;
-  const currentUri = `${protocol}//${host}${pathname}`;
-  return currentUri === redirectUri || currentUri === `${redirectUri}/`;
+  const { pathname: currentPathName } = window.location;
+  const redirectPathname = new URL(redirectUri).pathname;
+  return (
+    currentPathName === redirectPathname ||
+    currentPathName === `${redirectPathname}/`
+  );
 }

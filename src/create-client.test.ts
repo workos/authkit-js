@@ -326,6 +326,94 @@ describe("create-client", () => {
       });
     });
 
+    describe("getSignInUrl", () => {
+      beforeEach(() => {
+        mockLocation();
+      });
+
+      afterEach(() => {
+        restoreLocation();
+      });
+
+      it("generates a PKCE challenge and returns the AuthKit sign-in page URL", async () => {
+        const { scope } = nockRefresh();
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        const signInUrl = await client.getSignInUrl();
+        const url = new URL(signInUrl);
+
+        // Location.assign should not be called
+        expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        expect({
+          url,
+          searchParams: Object.fromEntries(url.searchParams.entries()),
+        }).toEqual({
+          url: expect.objectContaining({
+            origin: "https://api.workos.com",
+            pathname: "/user_management/authorize",
+          }),
+          searchParams: {
+            client_id: "client_123abc",
+            code_challenge: expect.any(String),
+            code_challenge_method: "S256",
+            provider: "authkit",
+            redirect_uri: "https://example.com/",
+            response_type: "code",
+            screen_hint: "sign-in",
+          },
+        });
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();
+        scope.done();
+      });
+    });
+
+    describe("getSignUpUrl", () => {
+      beforeEach(() => {
+        mockLocation();
+      });
+
+      afterEach(() => {
+        restoreLocation();
+      });
+
+      it("generates a PKCE challenge and returns the AuthKit sign-up page URL", async () => {
+        const { scope } = nockRefresh();
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
+
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        const signUpUrl = await client.getSignUpUrl();
+        const url = new URL(signUpUrl);
+
+        // Location.assign should not be called
+        expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        expect({
+          url,
+          searchParams: Object.fromEntries(url.searchParams.entries()),
+        }).toEqual({
+          url: expect.objectContaining({
+            origin: "https://api.workos.com",
+            pathname: "/user_management/authorize",
+          }),
+          searchParams: {
+            client_id: "client_123abc",
+            code_challenge: expect.any(String),
+            code_challenge_method: "S256",
+            provider: "authkit",
+            redirect_uri: "https://example.com/",
+            response_type: "code",
+            screen_hint: "sign-up",
+          },
+        });
+        expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();
+        scope.done();
+      });
+    });
+
     describe("signOut", () => {
       beforeEach(() => {
         mockLocation();
@@ -384,6 +472,92 @@ describe("create-client", () => {
         });
       });
 
+      describe("when the `navigate` option is set to false", () => {
+        it("makes a fetch request instead of redirecting", async () => {
+          const { scope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          const originalFetch = global.fetch;
+          const mockFetch = jest.fn().mockResolvedValue({
+            ok: true,
+          });
+          global.fetch = mockFetch;
+
+          try {
+            await client.signOut({ navigate: false });
+
+            // Location.assign should not be called
+            expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+
+            // Fetch should be called with the correct URL
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            const fetchUrl = new URL(mockFetch.mock.calls[0][0]);
+            expect({
+              fetchUrl,
+              searchParams: Object.fromEntries(fetchUrl.searchParams.entries()),
+            }).toEqual({
+              fetchUrl: expect.objectContaining({
+                origin: "https://api.workos.com",
+                pathname: "/user_management/sessions/logout",
+              }),
+              searchParams: { session_id: "session_123abc" },
+            });
+            scope.done();
+          } finally {
+            global.fetch = originalFetch;
+          }
+        });
+
+        it("includes the `returnTo` parameter", async () => {
+          const { scope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          const originalFetch = global.fetch;
+          const mockFetch = jest.fn().mockResolvedValue({
+            ok: true,
+          });
+          global.fetch = mockFetch;
+
+          try {
+            await client.signOut({
+              returnTo: "https://example.com",
+              navigate: false,
+            });
+
+            // Location.assign should not be called
+            expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            const fetchUrl = new URL(mockFetch.mock.calls[0][0]);
+            expect({
+              fetchUrl,
+              searchParams: Object.fromEntries(fetchUrl.searchParams.entries()),
+            }).toEqual({
+              fetchUrl: expect.objectContaining({
+                origin: "https://api.workos.com",
+                pathname: "/user_management/sessions/logout",
+              }),
+              searchParams: {
+                session_id: "session_123abc",
+                return_to: "https://example.com",
+              },
+            });
+
+            scope.done();
+          } finally {
+            global.fetch = originalFetch;
+          }
+        });
+      });
+
       describe("when tokens are persisted in local storage in development", () => {
         it("clears the tokens", async () => {
           localStorage.setItem(storageKeys.refreshToken, "refresh_token");
@@ -397,6 +571,48 @@ describe("create-client", () => {
 
           expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
           scope.done();
+        });
+
+        describe("when `returnTo` is provided", () => {
+          it("clears the tokens", async () => {
+            localStorage.setItem(storageKeys.refreshToken, "refresh_token");
+            const { scope } = nockRefresh({ devMode: true });
+
+            client = await createClient("client_123abc", {
+              redirectUri: "https://example.com/",
+              devMode: true,
+            });
+            client.signOut({ returnTo: "https://example.com" });
+
+            expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
+            scope.done();
+          });
+        });
+
+        describe("when the `navigate` is set to false", () => {
+          it("clears the tokens", async () => {
+            localStorage.setItem(storageKeys.refreshToken, "refresh_token");
+            const { scope } = nockRefresh({ devMode: true });
+
+            client = await createClient("client_123abc", {
+              redirectUri: "https://example.com/",
+              devMode: true,
+            });
+
+            const originalFetch = global.fetch;
+            const mockFetch = jest.fn().mockResolvedValue({
+              ok: true,
+            });
+            global.fetch = mockFetch;
+
+            try {
+              await client.signOut({ navigate: false });
+              expect(localStorage.getItem(storageKeys.refreshToken)).toBeNull();
+              scope.done();
+            } finally {
+              global.fetch = originalFetch;
+            }
+          });
         });
       });
     });
