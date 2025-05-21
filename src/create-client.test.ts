@@ -472,7 +472,7 @@ describe("create-client", () => {
         });
       });
 
-      describe("when the `noRedirect` option is provided", () => {
+      describe("when the `navigate` option is set to false", () => {
         it("makes a fetch request instead of redirecting", async () => {
           const { scope } = nockRefresh();
 
@@ -589,7 +589,7 @@ describe("create-client", () => {
           });
         });
 
-        describe("when `noRedirect` is true", () => {
+        describe("when the `navigate` is set to false", () => {
           it("clears the tokens", async () => {
             localStorage.setItem(storageKeys.refreshToken, "refresh_token");
             const { scope } = nockRefresh({ devMode: true });
