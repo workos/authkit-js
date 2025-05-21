@@ -136,7 +136,12 @@ export class Client {
     window.location.assign(url);
   }
 
-  signOut(options?: { returnTo?: string; noRedirect?: boolean }): void {
+  signOut(options?: { returnTo?: string; navigate?: true }): void;
+  signOut(options?: { returnTo?: string; navigate: false }): Promise<void>;
+  signOut(
+    options: { returnTo?: string; navigate?: boolean } = { navigate: true },
+  ): void | Promise<void> {
+    const navigate = options.navigate ?? true;
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") return;
     const { sid: sessionId } = getClaims(accessToken);
@@ -148,10 +153,20 @@ export class Client {
 
     if (url) {
       removeSessionData({ devMode: this.#devMode });
-      if (options?.noRedirect) {
-        fetch(url);
-      } else {
+
+      if (navigate) {
         window.location.assign(url);
+      } else {
+        return new Promise(async (resolve) => {
+          fetch(url, {
+            mode: "no-cors",
+            credentials: "include",
+          })
+            .catch((error) => {
+              console.warn("AuthKit: Failed to send logout request", error);
+            })
+            .finally(resolve);
+        });
       }
     }
   }
