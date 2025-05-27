@@ -1,22 +1,15 @@
-import { AuthenticationResponse } from "../interfaces";
+import { AuthenticationResponse, JwtPayload } from "../interfaces";
+import { decodeJwt } from "./jwt";
 import { memoryStorage } from "./memory-storage";
 import { storageKeys } from "./storage-keys";
 
-interface AccessToken {
-  exp: number;
-  iat: number;
-  iss: string;
-  jti: string;
-  sid: string;
-  sub: string;
-  org_id?: string;
-  role?: string;
-  permissions?: string[];
-}
-
-// should replace this with jose if we ever need to verify the JWT
-export function getClaims(accessToken: string) {
-  return JSON.parse(atob(accessToken.split(".")[1])) as AccessToken;
+/**
+ * Retrieves the claims from a JWT access token.
+ * @param accessToken - The JWT access token to decode.
+ * @returns The decoded JWT payload, which includes the claims.
+ */
+export function getClaims<T = {}>(accessToken: string): JwtPayload & T {
+  return decodeJwt<T>(accessToken).payload;
 }
 
 export function setSessionData(
