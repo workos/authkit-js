@@ -1,4 +1,4 @@
-import { AuthenticationResponse, JwtPayload } from "../interfaces";
+import { AuthenticationResponse, JWTPayload } from "../interfaces";
 import { decodeJwt } from "./jwt";
 import { memoryStorage } from "./memory-storage";
 import { storageKeys } from "./storage-keys";
@@ -8,7 +8,7 @@ import { storageKeys } from "./storage-keys";
  * @param accessToken - The JWT access token to decode.
  * @returns The decoded JWT payload, which includes the claims.
  */
-export function getClaims<T = {}>(accessToken: string): JwtPayload & T {
+export function getClaims<T = {}>(accessToken: string): JWTPayload & T {
   return decodeJwt<T>(accessToken).payload;
 }
 

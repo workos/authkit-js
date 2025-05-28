@@ -1,11 +1,11 @@
 /**
  * JWT (JSON Web Token) Interface Definitions
  */
-export interface JwtHeader {
+export interface JWTHeader {
   alg: string;
   typ?: string | undefined;
   cty?: string | undefined;
-  crit?: Array<string | Exclude<keyof JwtHeader, "crit">> | undefined;
+  crit?: Array<string | Exclude<keyof JWTHeader, "crit">> | undefined;
   kid?: string | undefined;
   jku?: string | undefined;
   x5u?: string | string[] | undefined;
@@ -16,7 +16,7 @@ export interface JwtHeader {
 /**
  * JWT Payload Interface
  */
-export interface JwtPayload {
+export interface JWTPayload {
   /**
    * Session ID of the JWT, used to identify the session
    */

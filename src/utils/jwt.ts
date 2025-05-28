@@ -1,4 +1,4 @@
-import { JwtHeader, JwtPayload } from "../interfaces/jwt.interface";
+import { JWTHeader, JWTPayload } from "../interfaces/jwt.interface";
 
 /**
  * Decodes a base64url encoded string
@@ -21,8 +21,8 @@ function decodeBase64Url(input: string): string {
 export function decodeJwt<T = {}>(
   token: string,
 ): {
-  header: JwtHeader;
-  payload: JwtPayload & T;
+  header: JWTHeader;
+  payload: JWTPayload & T;
 } {
   const parts = token.split(".");
 
@@ -31,8 +31,8 @@ export function decodeJwt<T = {}>(
   }
 
   try {
-    const header = JSON.parse(decodeBase64Url(parts[0])) as JwtHeader;
-    const payload = JSON.parse(decodeBase64Url(parts[1])) as JwtPayload & T;
+    const header = JSON.parse(decodeBase64Url(parts[0])) as JWTHeader;
+    const payload = JSON.parse(decodeBase64Url(parts[1])) as JWTPayload & T;
 
     return { header, payload };
   } catch (error) {

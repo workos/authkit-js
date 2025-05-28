@@ -7,4 +7,4 @@ export type { CreateClientOptions } from "./create-client-options.interface";
 export type { GetAuthorizationUrlOptions } from "./get-authorization-url-options.interface";
 export type { Impersonator, ImpersonatorRaw } from "./impersonator.interface";
 export type { User, UserRaw } from "./user.interface";
-export type { JwtHeader, JwtPayload } from "./jwt.interface";
+export type { JWTPayload } from "./jwt.interface";

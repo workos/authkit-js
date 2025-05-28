@@ -4,7 +4,6 @@ export {
   User,
   AuthenticationResponse,
   OnRefreshResponse,
-  JwtHeader,
-  JwtPayload,
+  JWTPayload,
 } from "./interfaces";
 export { AuthKitError, LoginRequiredError } from "./errors";
