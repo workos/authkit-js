@@ -46,6 +46,7 @@ describe("create-client", () => {
     sid?: string;
     jti?: string;
     org_id?: string;
+    [key: string]: any; // Allow additional properties for testing
   }
 
   const mockAccessToken = ({
@@ -53,8 +54,13 @@ describe("create-client", () => {
     iat = Date.now() / 1000,
     exp = Date.now() / 1000 + 3600,
     jti,
-  }: MockAccessTokenClaims = {}) =>
-    "." + btoa(JSON.stringify({ sid, iat, exp, jti }));
+    ...rest
+  }: MockAccessTokenClaims = {}) => {
+    // Create a valid JWT format that works with both getClaims and decodeJwt
+    const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payload = btoa(JSON.stringify({ sid, iat, exp, jti, ...rest }));
+    return `${header}.${payload}.mock-signature`;
+  };
 
   describe("createClient", () => {
     describe("with no `clientId` provided", () => {
@@ -671,7 +677,7 @@ describe("create-client", () => {
               id: "user_123abc",
             },
             organizationId: "org_abc",
-            accessToken: expect.stringMatching(/^.eyJ/),
+            accessToken: expect.stringMatching(/^eyJ/),
           }),
         );
       });
@@ -690,7 +696,7 @@ describe("create-client", () => {
 
         expect(onRefresh).toHaveBeenCalledWith(
           expect.objectContaining({
-            accessToken: expect.stringMatching(/^.eyJ/),
+            accessToken: expect.stringMatching(/^eyJ/),
           }),
         );
         expect(onRefresh).not.toHaveBeenCalledWith(
@@ -879,7 +885,7 @@ describe("create-client", () => {
 
           const { scope: successScope } = nockRefresh();
           const accessToken = await client.getAccessToken();
-          expect(accessToken).toMatch(/^.eyJ/);
+          expect(accessToken).toMatch(/^eyJ/);
           successScope.done();
         });
       });
