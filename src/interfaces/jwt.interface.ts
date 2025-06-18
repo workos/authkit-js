@@ -61,4 +61,9 @@ export interface JWTPayload {
    * Permissions granted to the user associated with the JWT
    */
   permissions?: string[];
+
+  /**
+   * Feature flags granted to the organization associated with the JWT
+   */
+  feature_flags?: string[];
 }
