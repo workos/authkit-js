@@ -58,7 +58,7 @@ export interface JWTPayload {
   role?: string;
 
   /**
-   * Role of the user associated with the JWT
+   * Roles of the user associated with the JWT
    */
   roles?: string;
 
