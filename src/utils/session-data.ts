@@ -18,7 +18,15 @@ export function setSessionData(
 ) {
   const { user, accessToken, refreshToken } = data;
   memoryStorage.setItem(storageKeys.user, user);
-  memoryStorage.setItem(storageKeys.accessToken, accessToken);
+  const currentAccessToken = memoryStorage.getItem(storageKeys.accessToken);
+  if (currentAccessToken !== accessToken) {
+    globalThis.dispatchEvent(
+      new CustomEvent("authkit:tokenchange", {
+        detail: { accessToken },
+      }),
+    );
+    memoryStorage.setItem(storageKeys.accessToken, accessToken);
+  }
   (devMode ? window.localStorage : memoryStorage).setItem(
     storageKeys.refreshToken,
     refreshToken,
@@ -43,4 +51,18 @@ export function getRefreshToken({ devMode = false } = {}) {
   return (devMode ? window.localStorage : memoryStorage).getItem(
     storageKeys.refreshToken,
   ) as string | undefined;
+}
+
+interface CustomEventMap {
+  "authkit:tokenchange": CustomEvent<{ accessToken: string }>;
+}
+
+declare global {
+  interface Window {
+    addEventListener<K extends keyof CustomEventMap>(
+      type: K,
+      listener: (this: Document, ev: CustomEventMap[K]) => void,
+    ): void;
+    dispatchEvent<K extends keyof CustomEventMap>(ev: CustomEventMap[K]): void;
+  }
 }
