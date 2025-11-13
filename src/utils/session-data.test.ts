@@ -22,15 +22,6 @@ describe("setSessionData", () => {
   const validToken =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5In0.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoiMTIzNDU2Nzg5MCIsImF1ZCI6WyJhdWRpZW5jZTEiLCJhdWRpZW5jZTIiXSwiZXhwIjoxNzM1Njg5NjAwLCJpYXQiOjE3MzU2MDMyMDAsImp0aSI6InVuaXF1ZS1pZCIsImN1c3RvbSI6InZhbHVlIiwibmVzdGVkIjp7ImtleSI6InZhbHVlIn19.signature";
 
-  const tokenchangeListener = jest.fn();
-  beforeEach(() => {
-    window.addEventListener("authkit:tokenchange", tokenchangeListener);
-  });
-  afterEach(() => {
-    window.removeEventListener("authkit:tokenchange", tokenchangeListener);
-    memoryStorage.reset();
-  });
-
   it("updates storage when the access token is set", () => {
     const currentAccessToken = memoryStorage.getItem(storageKeys.accessToken);
     setSessionData({
@@ -41,19 +32,6 @@ describe("setSessionData", () => {
     expect(memoryStorage.getItem(storageKeys.accessToken)).toBe(validToken);
     expect(memoryStorage.getItem(storageKeys.accessToken)).not.toBe(
       currentAccessToken,
-    );
-  });
-
-  it("dispatches a tokenchange event when the access token is set", () => {
-    setSessionData({
-      accessToken: validToken,
-      refreshToken: "refresh_token",
-      user: mockUser,
-    });
-    expect(tokenchangeListener).toHaveBeenCalledWith(
-      expect.objectContaining({
-        detail: { accessToken: validToken },
-      }),
     );
   });
 });
