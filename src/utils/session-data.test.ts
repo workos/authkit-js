@@ -40,7 +40,7 @@ describe("setSessionData", () => {
     });
     expect(memoryStorage.getItem(storageKeys.accessToken)).toBe(validToken);
     expect(memoryStorage.getItem(storageKeys.accessToken)).not.toBe(
-      currentAccessToken
+      currentAccessToken,
     );
   });
 
@@ -53,7 +53,7 @@ describe("setSessionData", () => {
     expect(tokenchangeListener).toHaveBeenCalledWith(
       expect.objectContaining({
         detail: { accessToken: validToken },
-      })
+      }),
     );
   });
 });
