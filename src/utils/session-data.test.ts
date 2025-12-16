@@ -27,6 +27,7 @@ describe("setSessionData", () => {
     setSessionData({
       accessToken: validToken,
       refreshToken: "refresh_token",
+      authenticationMethod: "Password",
       user: mockUser,
     });
     expect(memoryStorage.getItem(storageKeys.accessToken)).toBe(validToken);
