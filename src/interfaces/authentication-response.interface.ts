@@ -4,12 +4,25 @@ import { Impersonator, ImpersonatorRaw } from "./impersonator.interface";
 export type AuthenticationMethod =
   | "SSO"
   | "Password"
+  | "Passkey"
   | "AppleOAuth"
+  | "BitbucketOAuth"
+  | "CrossAppAuth"
+  | "DiscordOAuth"
+  | "ExternalAuth"
   | "GitHubOAuth"
+  | "GitLabOAuth"
   | "GoogleOAuth"
+  | "LinkedInOAuth"
   | "MicrosoftOAuth"
+  | "SalesforceOAuth"
+  | "SlackOAuth"
+  | "VercelMarketplaceOAuth"
+  | "VercelOAuth"
+  | "XeroOAuth"
   | "MagicAuth"
-  | "Impersonation";
+  | "Impersonation"
+  | "MigratedSession";
 
 export interface AuthenticationResponse {
   user: User;
