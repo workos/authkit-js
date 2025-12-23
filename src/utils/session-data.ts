@@ -16,9 +16,10 @@ export function setSessionData(
   data: AuthenticationResponse,
   { devMode = false } = {},
 ) {
-  const { user, accessToken, refreshToken } = data;
+  const { user, accessToken, refreshToken, authenticationMethod } = data;
   memoryStorage.setItem(storageKeys.user, user);
   memoryStorage.setItem(storageKeys.accessToken, accessToken);
+  memoryStorage.setItem(storageKeys.authenticationMethod, authenticationMethod);
   (devMode ? window.localStorage : memoryStorage).setItem(
     storageKeys.refreshToken,
     refreshToken,
@@ -34,6 +35,7 @@ export function setSessionData(
 export function removeSessionData({ devMode = false } = {}) {
   memoryStorage.removeItem(storageKeys.user);
   memoryStorage.removeItem(storageKeys.accessToken);
+  memoryStorage.removeItem(storageKeys.authenticationMethod);
   (devMode ? window.localStorage : memoryStorage).removeItem(
     storageKeys.refreshToken,
   );

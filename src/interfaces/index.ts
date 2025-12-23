@@ -1,4 +1,5 @@
 export type {
+  AuthenticationMethod,
   AuthenticationResponse,
   AuthenticationResponseRaw,
   OnRefreshResponse,

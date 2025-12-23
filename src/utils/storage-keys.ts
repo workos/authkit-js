@@ -4,4 +4,5 @@ export const storageKeys = {
   accessToken: "workos:access-token",
   refreshToken: "workos:refresh-token",
   expiresAt: "workos:expires-at",
+  authenticationMethod: "workos:authentication-method",
 } as const;
