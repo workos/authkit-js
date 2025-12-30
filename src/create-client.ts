@@ -233,6 +233,7 @@ export class Client {
           if (authenticationResponse) {
             this.#state = { tag: "AUTHENTICATED" };
             this.#scheduleAutomaticRefresh();
+            window.sessionStorage.removeItem(storageKeys.codeVerifier);
             setSessionData(authenticationResponse, { devMode: this.#devMode });
             this.#onRefresh(authenticationResponse);
             this.#onRedirectCallback({ state, ...authenticationResponse });
