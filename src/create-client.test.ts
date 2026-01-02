@@ -654,7 +654,10 @@ describe("create-client", () => {
           });
 
           await expect(
-            client.signOut({ returnTo: "https://example.com/logged-out", navigate: false }),
+            client.signOut({
+              returnTo: "https://example.com/logged-out",
+              navigate: false,
+            }),
           ).resolves.toBeUndefined();
 
           expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
