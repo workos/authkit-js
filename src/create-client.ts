@@ -15,7 +15,7 @@ import {
 } from "./utils";
 import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
-import { LoginRequiredError, RefreshError } from "./errors";
+import { LoginRequiredError, NoSessionError, RefreshError } from "./errors";
 import { withLock, LockError } from "./utils/locking";
 import { HttpClient } from "./http-client";
 
@@ -141,14 +141,27 @@ export class Client {
   signOut(
     options: { returnTo?: string; navigate?: boolean } = { navigate: true },
   ): void | Promise<void> {
-    const navigate = options.navigate ?? true;
+    const { navigate = true, returnTo } = options;
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
-    if (typeof accessToken !== "string") return;
+    if (typeof accessToken !== "string") {
+      if (!returnTo) {
+        if (navigate) {
+          throw new NoSessionError();
+        }
+
+        return Promise.reject(new NoSessionError());
+      }
+      if (navigate) {
+        window.location.assign(returnTo);
+        return;
+      }
+      return Promise.resolve();
+    }
     const { sid: sessionId } = getClaims(accessToken);
 
     const url = this.#httpClient.getLogoutUrl({
       sessionId,
-      returnTo: options?.returnTo,
+      returnTo,
     });
 
     if (url) {

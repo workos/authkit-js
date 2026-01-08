@@ -6,7 +6,7 @@ import {
   createClient,
   ORGANIZATION_ID_SESSION_STORAGE_KEY,
 } from "./create-client";
-import { LoginRequiredError, RefreshError } from "./errors";
+import { LoginRequiredError, NoSessionError, RefreshError } from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
 import { getClaims } from "./utils/session-data";
 import { storageKeys } from "./utils/storage-keys";
@@ -619,6 +619,58 @@ describe("create-client", () => {
               global.fetch = originalFetch;
             }
           });
+        });
+      });
+
+      describe("when there is no session", () => {
+        beforeEach(() => {
+          cookieMock.mockReturnValue("");
+        });
+
+        it("throws NoSessionError when no returnTo is provided", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          expect(() => client.signOut()).toThrow(NoSessionError);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        });
+
+        it("redirects directly to returnTo when navigate is true", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          client.signOut({ returnTo: "https://example.com/logged-out" });
+
+          expect(jest.mocked(location.assign)).toHaveBeenCalledWith(
+            "https://example.com/logged-out",
+          );
+        });
+
+        it("resolves silently when navigate is false and returnTo is provided", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          await expect(
+            client.signOut({
+              returnTo: "https://example.com/logged-out",
+              navigate: false,
+            }),
+          ).resolves.toBeUndefined();
+
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        });
+
+        it("rejects with NoSessionError when navigate is false and no returnTo", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          await expect(client.signOut({ navigate: false })).rejects.toThrow(
+            NoSessionError,
+          );
         });
       });
     });
