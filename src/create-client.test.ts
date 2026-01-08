@@ -257,7 +257,7 @@ describe("create-client", () => {
         restoreLocation();
       });
 
-      it("generates a PKCE challenge and redirects to the AuthKit sign-in page", async () => {
+      it("generates a PKCE challenge and redirects to AuthKit", async () => {
         const { scope } = nockRefresh();
         expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
 
@@ -282,7 +282,6 @@ describe("create-client", () => {
             provider: "authkit",
             redirect_uri: "https://example.com/",
             response_type: "code",
-            screen_hint: "sign-in",
           },
         });
         expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();
@@ -341,7 +340,7 @@ describe("create-client", () => {
         restoreLocation();
       });
 
-      it("generates a PKCE challenge and returns the AuthKit sign-in page URL", async () => {
+      it("generates a PKCE challenge and returns the AuthKit URL", async () => {
         const { scope } = nockRefresh();
         expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeNull();
 
@@ -368,7 +367,6 @@ describe("create-client", () => {
             provider: "authkit",
             redirect_uri: "https://example.com/",
             response_type: "code",
-            screen_hint: "sign-in",
           },
         });
         expect(sessionStorage.getItem(storageKeys.codeVerifier)).toBeDefined();

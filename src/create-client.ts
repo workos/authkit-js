@@ -30,7 +30,7 @@ interface RedirectOptions {
   organizationId?: string;
   passwordResetToken?: string;
   state?: any;
-  type: "sign-in" | "sign-up";
+  screenHint?: "sign-in" | "sign-up";
 }
 
 type State =
@@ -116,23 +116,29 @@ export class Client {
     }
   }
 
-  async getSignInUrl(opts: Omit<RedirectOptions, "type"> = {}) {
-    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+  async getSignInUrl(opts: Omit<RedirectOptions, "screenHint"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts });
     return url;
   }
 
-  async getSignUpUrl(opts: Omit<RedirectOptions, "type"> = {}) {
-    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+  async getSignUpUrl(opts: Omit<RedirectOptions, "screenHint"> = {}) {
+    const url = await this.#getAuthorizationUrl({
+      ...opts,
+      screenHint: "sign-up",
+    });
     return url;
   }
 
-  async signIn(opts: Omit<RedirectOptions, "type"> = {}) {
-    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-in" });
+  async signIn(opts: Omit<RedirectOptions, "screenHint"> = {}) {
+    const url = await this.#getAuthorizationUrl({ ...opts });
     window.location.assign(url);
   }
 
-  async signUp(opts: Omit<RedirectOptions, "type"> = {}) {
-    const url = await this.#getAuthorizationUrl({ ...opts, type: "sign-up" });
+  async signUp(opts: Omit<RedirectOptions, "screenHint"> = {}) {
+    const url = await this.#getAuthorizationUrl({
+      ...opts,
+      screenHint: "sign-up",
+    });
     window.location.assign(url);
   }
 
@@ -433,7 +439,7 @@ An authorization_code was supplied for a login which did not originate at the ap
     organizationId,
     passwordResetToken,
     state,
-    type,
+    screenHint,
   }: RedirectOptions) {
     const { codeVerifier, codeChallenge } = await createPkceChallenge();
     // store the code verifier in session storage for later use (after the redirect back from authkit)
@@ -447,7 +453,7 @@ An authorization_code was supplied for a login which did not originate at the ap
       organizationId,
       passwordResetToken,
       redirectUri: this.#redirectUri,
-      screenHint: type,
+      screenHint,
       state: state ? JSON.stringify(state) : undefined,
     });
 
