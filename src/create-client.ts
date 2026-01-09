@@ -232,42 +232,33 @@ export class Client {
     const state = stateParam ? JSON.parse(stateParam) : undefined;
 
     // grab the previously stored code verifier from session storage
+    // Note: For OAuth flows, this should exist. For SAML flows, it won't exist.
     const codeVerifier = window.sessionStorage.getItem(
       storageKeys.codeVerifier,
     );
 
     if (code) {
-      if (codeVerifier) {
-        try {
-          this.#state = {
-            tag: "AUTHENTICATING",
-            response: this.#httpClient.authenticateWithCode({
-              code,
-              codeVerifier,
-              useCookie: this.#useCookie,
-            }),
-          };
-          const authenticationResponse = await this.#state.response;
+      try {
+        this.#state = {
+          tag: "AUTHENTICATING",
+          response: this.#httpClient.authenticateWithCode({
+            code,
+            codeVerifier: codeVerifier ?? undefined,
+            useCookie: this.#useCookie,
+          }),
+        };
+        const authenticationResponse = await this.#state.response;
 
-          if (authenticationResponse) {
-            this.#state = { tag: "AUTHENTICATED" };
-            this.#scheduleAutomaticRefresh();
-            setSessionData(authenticationResponse, { devMode: this.#devMode });
-            this.#onRefresh(authenticationResponse);
-            this.#onRedirectCallback({ state, ...authenticationResponse });
-          }
-        } catch (error) {
-          this.#state = { tag: "ERROR" };
-          console.error(error);
+        if (authenticationResponse) {
+          this.#state = { tag: "AUTHENTICATED" };
+          this.#scheduleAutomaticRefresh();
+          setSessionData(authenticationResponse, { devMode: this.#devMode });
+          this.#onRefresh(authenticationResponse);
+          this.#onRedirectCallback({ state, ...authenticationResponse });
         }
-      } else {
+      } catch (error) {
         this.#state = { tag: "ERROR" };
-        console.error(`Couldn't exchange code.
-
-An authorization_code was supplied for a login which did not originate at the application. This could happen for various reasons:
-
-* This could have been an attempted Login CSRF attack. You were not affected.
-* The developer may not have configured a Login Initiation endpoint.`);
+        console.error(error);
       }
     }
 

@@ -71,18 +71,40 @@ describe("create-client", () => {
 
     describe("when the current route has a `code`", () => {
       describe("when no `codeVerifier` is present in session storage", () => {
-        it("logs an error", async () => {
-          jest.spyOn(console, "error").mockImplementation();
+        it("attempts authentication without code_verifier for SAML flows", async () => {
+          const accessToken = mockAccessToken();
+
+          nock("https://api.workos.com")
+            .post("/user_management/authenticate", (body) => {
+              // Verify code_verifier is NOT sent when it doesn't exist
+              return !body.hasOwnProperty("code_verifier");
+            })
+            .reply(200, {
+              user: {
+                object: "user",
+                id: "user_123",
+                email: "user@example.com",
+                email_verified: true,
+                profile_picture_url: "https://example.com/avatar.png",
+                first_name: "Test",
+                last_name: "User",
+                created_at: "2024-01-01T00:00:00.000Z",
+                updated_at: "2024-01-01T00:00:00.000Z",
+              },
+              access_token: accessToken,
+              refresh_token: "refresh_token_123",
+              authentication_method: "SSO",
+              organization_id: "org_123",
+            });
 
           client = await createClient("client_123abc", {
             redirectUri: "https://example.com/callback",
           });
 
-          expect(console.error).toHaveBeenCalledWith(
-            expect.stringContaining(
-              "An authorization_code was supplied for a login which did not originate at the application.",
-            ),
-          );
+          expect(client.getUser()).toMatchObject({
+            id: "user_123",
+            email: "user@example.com",
+          });
         });
       });
 

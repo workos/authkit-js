@@ -63,7 +63,7 @@ export class HttpClient {
     useCookie,
   }: {
     code: string;
-    codeVerifier: string;
+    codeVerifier?: string;
     useCookie: boolean;
   }) {
     const response = await this.#post("/user_management/authenticate", {
@@ -72,7 +72,9 @@ export class HttpClient {
         code,
         client_id: this.#clientId,
         grant_type: "authorization_code",
-        code_verifier: codeVerifier,
+        // Only include code_verifier for OAuth flows (when present)
+        // SAML flows don't use PKCE and shouldn't send code_verifier
+        ...(codeVerifier && { code_verifier: codeVerifier }),
       },
     });
 
