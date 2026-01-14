@@ -237,6 +237,7 @@ describe("create-client", () => {
           client_id: "client_123abc",
           grant_type: "refresh_token",
           refresh_token: devMode ? currentRefreshToken : undefined,
+          ...(organizationId && { organization_id: organizationId }),
         })
         .reply(200, {
           user: { id: "user_123abc" },
@@ -620,6 +621,30 @@ describe("create-client", () => {
         });
       });
 
+      describe("when there is an organization ID in session storage", () => {
+        beforeEach(() => {
+          sessionStorage.setItem(
+            ORGANIZATION_ID_SESSION_STORAGE_KEY,
+            "org_123abc",
+          );
+        });
+
+        it("removes the organization ID from session storage", async () => {
+          const { scope } = nockRefresh({ organizationId: "org_123abc" });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+          client.signOut();
+
+          expect(
+            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY),
+          ).toBeNull();
+
+          scope.done();
+        });
+      });
+
       describe("when there is no session", () => {
         beforeEach(() => {
           cookieMock.mockReturnValue("");
@@ -710,6 +735,7 @@ describe("create-client", () => {
 
     describe("onRefresh", () => {
       it("is called after a successful refresh", async () => {
+        sessionStorage.setItem(ORGANIZATION_ID_SESSION_STORAGE_KEY, "org_abc");
         const { scope } = nockRefresh({ organizationId: "org_abc" });
 
         const onRefresh = jest.fn();
@@ -890,6 +916,10 @@ describe("create-client", () => {
             .spyOn(console, "debug")
             .mockImplementation();
           const client = await clientWithExpiredAccessToken();
+          sessionStorage.setItem(
+            ORGANIZATION_ID_SESSION_STORAGE_KEY,
+            "org_123abc",
+          );
 
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
@@ -907,6 +937,9 @@ describe("create-client", () => {
           expect(consoleDebugSpy.mock.calls).toEqual([
             [expect.any(RefreshError)],
           ]);
+          expect(
+            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY),
+          ).toBeNull();
 
           scope.done();
         });
