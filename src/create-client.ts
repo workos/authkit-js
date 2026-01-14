@@ -172,6 +172,7 @@ export class Client {
 
     if (url) {
       removeSessionData({ devMode: this.#devMode });
+      sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
 
       if (navigate) {
         window.location.assign(url);
@@ -387,6 +388,7 @@ An authorization_code was supplied for a login which did not originate at the ap
 
       if (error instanceof RefreshError) {
         removeSessionData({ devMode: this.#devMode });
+        sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
         // fire the refresh failure UNLESS this is the initial refresh attempt
         // (the initial refresh is expected to fail if a user has not logged in
         // ever or recently)
