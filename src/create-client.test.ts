@@ -24,7 +24,7 @@ describe("create-client", () => {
     // assume we have a session already for all these tests
     cookieMock = jest
       .spyOn(document, "cookie", "get")
-      .mockReturnValue(`workos-has-session=1`);
+      .mockReturnValue(`workos-has-session=client_123abc`);
   });
 
   afterEach(() => {

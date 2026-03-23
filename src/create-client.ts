@@ -43,10 +43,19 @@ export const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
 
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
+function hasSessionCookie(clientId: string): boolean {
+  const match = document.cookie.match(/(?:^|;\s*)workos-has-session=([^;]*)/);
+  if (!match) return false;
+  const cookieValue = match[1];
+  // cookieValue == 1 is for backwards compat. can remove this in 400 days
+  return cookieValue === "1" ? true : cookieValue.split(".").includes(clientId);
+}
+
 export class Client {
   #state: State;
   #refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
+  readonly #clientId: string;
   readonly #httpClient: HttpClient;
   readonly #redirectUri: string;
   readonly #devMode: boolean;
@@ -83,6 +92,7 @@ export class Client {
       throw new NoClientIdProvidedException();
     }
 
+    this.#clientId = clientId;
     this.#httpClient = new HttpClient({ clientId, hostname, port, https });
     this.#devMode = devMode;
     this.#redirectUri = redirectUri;
@@ -103,7 +113,7 @@ export class Client {
     if (isRedirectCallback(this.#redirectUri, searchParams)) {
       await this.#handleCallback();
     } else if (
-      document.cookie.includes("workos-has-session=") ||
+      hasSessionCookie(this.#clientId) ||
       getRefreshToken({ devMode: this.#devMode })
     ) {
       try {
