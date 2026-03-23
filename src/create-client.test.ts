@@ -2,10 +2,7 @@
  * @jest-environment-options {"url": "https://example.com/callback?code=code_123"}
  */
 
-import {
-  createClient,
-  ORGANIZATION_ID_SESSION_STORAGE_KEY,
-} from "./create-client";
+import { createClient } from "./create-client";
 import { LoginRequiredError, NoSessionError, RefreshError } from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
 import { getClaims } from "./utils/session-data";
@@ -18,7 +15,8 @@ describe("create-client", () => {
 
   beforeEach(() => {
     sessionStorage.removeItem(storageKeys.codeVerifier);
-    sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
+    sessionStorage.removeItem("workos_organization_id");
+    sessionStorage.removeItem("workos-org-id:client_123abc");
     localStorage.removeItem(storageKeys.refreshToken);
 
     // assume we have a session already for all these tests
@@ -623,10 +621,7 @@ describe("create-client", () => {
 
       describe("when there is an organization ID in session storage", () => {
         beforeEach(() => {
-          sessionStorage.setItem(
-            ORGANIZATION_ID_SESSION_STORAGE_KEY,
-            "org_123abc",
-          );
+          sessionStorage.setItem("workos-org-id:client_123abc", "org_123abc");
         });
 
         it("removes the organization ID from session storage", async () => {
@@ -638,7 +633,7 @@ describe("create-client", () => {
           client.signOut();
 
           expect(
-            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY),
+            sessionStorage.getItem("workos-org-id:client_123abc"),
           ).toBeNull();
 
           scope.done();
@@ -735,7 +730,7 @@ describe("create-client", () => {
 
     describe("onRefresh", () => {
       it("is called after a successful refresh", async () => {
-        sessionStorage.setItem(ORGANIZATION_ID_SESSION_STORAGE_KEY, "org_abc");
+        sessionStorage.setItem("workos-org-id:client_123abc", "org_abc");
         const { scope } = nockRefresh({ organizationId: "org_abc" });
 
         const onRefresh = jest.fn();
@@ -916,10 +911,7 @@ describe("create-client", () => {
             .spyOn(console, "debug")
             .mockImplementation();
           const client = await clientWithExpiredAccessToken();
-          sessionStorage.setItem(
-            ORGANIZATION_ID_SESSION_STORAGE_KEY,
-            "org_123abc",
-          );
+          sessionStorage.setItem("workos-org-id:client_123abc", "org_123abc");
 
           const scope = nock("https://api.workos.com")
             .post("/user_management/authenticate", {
@@ -938,7 +930,7 @@ describe("create-client", () => {
             [expect.any(RefreshError)],
           ]);
           expect(
-            sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY),
+            sessionStorage.getItem("workos-org-id:client_123abc"),
           ).toBeNull();
 
           scope.done();

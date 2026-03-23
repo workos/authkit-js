@@ -24,12 +24,15 @@ describe("setSessionData", () => {
 
   it("updates storage when the access token is set", () => {
     const currentAccessToken = memoryStorage.getItem(storageKeys.accessToken);
-    setSessionData({
-      accessToken: validToken,
-      refreshToken: "refresh_token",
-      authenticationMethod: "Password",
-      user: mockUser,
-    });
+    setSessionData(
+      {
+        accessToken: validToken,
+        refreshToken: "refresh_token",
+        authenticationMethod: "Password",
+        user: mockUser,
+      },
+      { clientId: "client_123abc" },
+    );
     expect(memoryStorage.getItem(storageKeys.accessToken)).toBe(validToken);
     expect(memoryStorage.getItem(storageKeys.accessToken)).not.toBe(
       currentAccessToken,

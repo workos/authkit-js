@@ -39,7 +39,11 @@ type State =
   | { tag: "AUTHENTICATED" }
   | { tag: "ERROR" };
 
-export const ORGANIZATION_ID_SESSION_STORAGE_KEY = "workos_organization_id";
+const LEGACY_ORG_ID_KEY = "workos_organization_id";
+
+function orgIdKey(clientId: string) {
+  return `workos-org-id:${clientId}`;
+}
 
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
@@ -114,7 +118,7 @@ export class Client {
       await this.#handleCallback();
     } else if (
       hasSessionCookie(this.#clientId) ||
-      getRefreshToken({ devMode: this.#devMode })
+      getRefreshToken({ devMode: this.#devMode, clientId: this.#clientId })
     ) {
       try {
         await this.#refreshSession();
@@ -181,8 +185,9 @@ export class Client {
     });
 
     if (url) {
-      removeSessionData({ devMode: this.#devMode });
-      sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
+      removeSessionData({ devMode: this.#devMode, clientId: this.#clientId });
+      sessionStorage.removeItem(orgIdKey(this.#clientId));
+      sessionStorage.removeItem(LEGACY_ORG_ID_KEY);
 
       if (navigate) {
         window.location.assign(url);
@@ -263,7 +268,10 @@ export class Client {
           if (authenticationResponse) {
             this.#state = { tag: "AUTHENTICATED" };
             this.#scheduleAutomaticRefresh();
-            setSessionData(authenticationResponse, { devMode: this.#devMode });
+            setSessionData(authenticationResponse, {
+              devMode: this.#devMode,
+              clientId: this.#clientId,
+            });
             this.#onRefresh(authenticationResponse);
             this.#onRedirectCallback({ state, ...authenticationResponse });
           }
@@ -353,30 +361,35 @@ An authorization_code was supplied for a login which did not originate at the ap
     try {
       return await withLock(REFRESH_LOCK_NAME, async () => {
         if (organizationId) {
-          sessionStorage.setItem(
-            ORGANIZATION_ID_SESSION_STORAGE_KEY,
-            organizationId,
-          );
+          sessionStorage.setItem(orgIdKey(this.#clientId), organizationId);
         } else {
           const accessToken = this.#getAccessToken();
           if (accessToken) {
             organizationId = getClaims(accessToken)?.org_id;
           } else {
+            // Fall back to legacy key for backwards compat
             organizationId =
-              sessionStorage.getItem(ORGANIZATION_ID_SESSION_STORAGE_KEY) ??
+              sessionStorage.getItem(orgIdKey(this.#clientId)) ??
+              sessionStorage.getItem(LEGACY_ORG_ID_KEY) ??
               undefined;
           }
         }
 
         const authenticationResponse =
           await this.#httpClient.authenticateWithRefreshToken({
-            refreshToken: getRefreshToken({ devMode: this.#devMode }),
+            refreshToken: getRefreshToken({
+              devMode: this.#devMode,
+              clientId: this.#clientId,
+            }),
             organizationId,
             useCookie: this.#useCookie,
           });
 
         this.#state = { tag: "AUTHENTICATED" };
-        setSessionData(authenticationResponse, { devMode: this.#devMode });
+        setSessionData(authenticationResponse, {
+          devMode: this.#devMode,
+          clientId: this.#clientId,
+        });
         this.#onRefresh(authenticationResponse);
         return authenticationResponse;
       });
@@ -397,8 +410,9 @@ An authorization_code was supplied for a login which did not originate at the ap
       }
 
       if (error instanceof RefreshError) {
-        removeSessionData({ devMode: this.#devMode });
-        sessionStorage.removeItem(ORGANIZATION_ID_SESSION_STORAGE_KEY);
+        removeSessionData({ devMode: this.#devMode, clientId: this.#clientId });
+        sessionStorage.removeItem(orgIdKey(this.#clientId));
+        sessionStorage.removeItem(LEGACY_ORG_ID_KEY);
         // fire the refresh failure UNLESS this is the initial refresh attempt
         // (the initial refresh is expected to fail if a user has not logged in
         // ever or recently)
