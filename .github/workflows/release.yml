@@ -1,11 +1,8 @@
 name: Release
 
 on:
-  # Support manually pushing a new release
-  workflow_dispatch: {}
-  # Trigger when a release is published
-  release:
-    types: [published]
+  workflow_dispatch:
+  workflow_call:
 
 defaults:
   run:
@@ -33,12 +30,5 @@ jobs:
         run: |
           npm run build
 
-      - name: Push Release
-        if: ${{ !github.event.release.prerelease }}
-        run: |
-          npm publish --tag latest --access=public --provenance
-
-      - name: Push Pre-Release
-        if: ${{ github.event.release.prerelease }}
-        run: |
-          npm publish --tag next --access=public --provenance
+      - name: Publish
+        run: npm publish --tag latest --access=public --provenance
