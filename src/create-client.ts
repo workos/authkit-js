@@ -339,7 +339,9 @@ An authorization_code was supplied for a login which did not originate at the ap
       await this.#refreshSession({ organizationId });
     } catch (error) {
       if (error instanceof RefreshTimeoutError) {
-        console.warn("Couldn't switch organization: lock acquisition timed out.");
+        console.warn(
+          "Couldn't switch organization: lock acquisition timed out.",
+        );
       } else if (error instanceof RefreshError) {
         this.signIn({ ...signInOpts, organizationId });
       } else {

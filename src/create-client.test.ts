@@ -1099,9 +1099,7 @@ describe("create-client", () => {
       });
 
       it("does not throw when lock acquisition times out", async () => {
-        const consoleWarnSpy = jest
-          .spyOn(console, "warn")
-          .mockImplementation();
+        const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
         const { scope: createClientScope } = nockRefresh();
         client = await createClient("client_123abc", {
           redirectUri: "https://example.com/",
