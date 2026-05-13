@@ -975,7 +975,7 @@ describe("create-client", () => {
           expect(accessToken).toMatch(/^eyJ/);
         });
 
-        it("throws RefreshTimeoutError when lock times out and token is expired", async () => {
+        it("throws RefreshTimeoutError when lock times out twice and token is expired", async () => {
           const client = await clientWithExpiredAccessToken();
 
           installLockTimeout();
@@ -983,6 +983,32 @@ describe("create-client", () => {
           await expect(client.getAccessToken()).rejects.toThrow(
             RefreshTimeoutError,
           );
+        });
+
+        it("retries and succeeds when lock times out once then resolves", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          let callCount = 0;
+          Object.defineProperty(navigator, "locks", {
+            value: {
+              request: (_name: string, _opts: any, cb: any) => {
+                callCount++;
+                if (callCount === 1) {
+                  return Promise.reject(
+                    new DOMException("Signal timed out.", "AbortError"),
+                  );
+                }
+                return cb({ name: _name, mode: "exclusive" });
+              },
+            },
+            configurable: true,
+          });
+
+          const { scope } = nockRefresh();
+          const accessToken = await client.getAccessToken();
+          expect(accessToken).toMatch(/^eyJ/);
+          expect(callCount).toBe(2);
+          scope.done();
         });
 
         it("throws RefreshTimeoutError on forceRefresh even with unexpired token", async () => {

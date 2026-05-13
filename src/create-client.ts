@@ -221,7 +221,15 @@ export class Client {
             ? this.#getUnexpiredAccessToken()
             : undefined;
           if (token) return token;
-          throw err;
+
+          try {
+            await this.#refreshSession();
+          } catch (retryErr) {
+            if (retryErr instanceof RefreshTimeoutError) throw retryErr;
+            if (retryErr instanceof RefreshError)
+              throw new LoginRequiredError();
+            throw retryErr;
+          }
         } else if (err instanceof RefreshError) {
           throw new LoginRequiredError();
         } else {
