@@ -30,6 +30,7 @@ async function withNativeLock<T>(
   } catch (error) {
     if (error instanceof DOMException) {
       switch (error.name) {
+        case "TimeoutError":
         case "AbortError":
           throw new LockError("AcquisitionTimeoutError", lockName, "Native");
 

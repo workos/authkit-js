@@ -7,4 +7,9 @@ export {
   OnRefreshResponse,
   JWTPayload,
 } from "./interfaces";
-export { AuthKitError, LoginRequiredError, NoSessionError } from "./errors";
+export {
+  AuthKitError,
+  LoginRequiredError,
+  NoSessionError,
+  RefreshTimeoutError,
+} from "./errors";
