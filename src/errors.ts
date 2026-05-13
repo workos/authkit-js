@@ -10,9 +10,8 @@ export class RefreshTimeoutError extends RefreshError {
     message = "Timed out waiting to refresh the session.",
     options?: { cause?: unknown },
   ) {
-    super(message);
+    super(message, options);
     this.name = "RefreshTimeoutError";
-    if (options?.cause) this.cause = options.cause;
   }
 }
 

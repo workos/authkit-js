@@ -12,8 +12,6 @@ import {
 import { mockLocation, restoreLocation } from "./testing/mock-location";
 import { getClaims } from "./utils/session-data";
 import { storageKeys } from "./utils/storage-keys";
-import { LockError } from "./utils/locking";
-import { MockWebLocks } from "./testing/mock-web-locks";
 import nock from "nock";
 
 describe("create-client", () => {
@@ -42,8 +40,7 @@ describe("create-client", () => {
       "https://example.com/callback?code=code_123",
     );
 
-    // @ts-ignore — clean up any navigator.locks mock
-    delete navigator.locks;
+    delete (navigator as any).locks;
 
     nock.cleanAll();
   });
@@ -255,6 +252,18 @@ describe("create-client", () => {
         });
 
       return { scope };
+    }
+
+    function installLockTimeout() {
+      Object.defineProperty(navigator, "locks", {
+        value: {
+          request: () =>
+            Promise.reject(
+              new DOMException("Signal timed out.", "AbortError"),
+            ),
+        },
+        configurable: true,
+      });
     }
 
     describe("signIn", () => {
@@ -946,18 +955,6 @@ describe("create-client", () => {
           scope.done();
         });
 
-        const installLockTimeout = () => {
-          Object.defineProperty(navigator, "locks", {
-            value: {
-              request: () =>
-                Promise.reject(
-                  new DOMException("Signal timed out.", "AbortError"),
-                ),
-            },
-            configurable: true,
-          });
-        };
-
         it("returns the existing token when lock times out and token is unexpired", async () => {
           const now = Date.now();
           const { scope } = nockRefresh({
@@ -1107,15 +1104,7 @@ describe("create-client", () => {
         });
         createClientScope.done();
 
-        Object.defineProperty(navigator, "locks", {
-          value: {
-            request: () =>
-              Promise.reject(
-                new DOMException("Signal timed out.", "AbortError"),
-              ),
-          },
-          configurable: true,
-        });
+        installLockTimeout();
 
         await expect(
           client.switchToOrganization({ organizationId: "org_123abc" }),
