@@ -258,9 +258,7 @@ describe("create-client", () => {
       Object.defineProperty(navigator, "locks", {
         value: {
           request: () =>
-            Promise.reject(
-              new DOMException("Signal timed out.", "AbortError"),
-            ),
+            Promise.reject(new DOMException("Signal timed out.", "AbortError")),
         },
         configurable: true,
       });
