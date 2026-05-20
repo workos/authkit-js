@@ -109,6 +109,34 @@ describe("create-client", () => {
           expect(location.search).toBe("");
           nockScope.done();
         });
+
+        it("preserves non-OAuth query params when clearing the URL", async () => {
+          history.replaceState(
+            null,
+            "",
+            "https://example.com/callback?code=code_123&state=%7B%7D&foo=bar&baz=qux",
+          );
+          sessionStorage.setItem(storageKeys.codeVerifier, "code_verifier");
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              code: "code_123",
+              client_id: "client_123abc",
+              grant_type: "authorization_code",
+              code_verifier: "code_verifier",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/callback",
+          });
+
+          expect(location.search).toBe("?foo=bar&baz=qux");
+          nockScope.done();
+        });
       });
     });
 

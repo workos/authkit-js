@@ -290,9 +290,10 @@ An authorization_code was supplied for a login which did not originate at the ap
       }
     }
 
-    // Remove code from search params
+    // Remove code/state from search params
     const cleanUrl = new URL(window.location.toString());
-    cleanUrl.search = "";
+    cleanUrl.searchParams.delete("code");
+    cleanUrl.searchParams.delete("state");
     window.sessionStorage.removeItem(storageKeys.codeVerifier);
     window.history.replaceState({}, "", cleanUrl);
   }
