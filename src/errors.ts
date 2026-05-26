@@ -5,6 +5,16 @@ export class LoginRequiredError extends AuthKitError {
   readonly message: string = "No access token available";
 }
 
+export class RefreshTimeoutError extends RefreshError {
+  constructor(
+    message = "Timed out waiting to refresh the session.",
+    options?: { cause?: unknown },
+  ) {
+    super(message, options);
+    this.name = "RefreshTimeoutError";
+  }
+}
+
 export class NoSessionError extends AuthKitError {
   readonly message =
     "SignOut() called without an active session. Provide a returnTo URL to redirect anyway.";

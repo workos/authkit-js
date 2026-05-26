@@ -3,7 +3,12 @@
  */
 
 import { createClient } from "./create-client";
-import { LoginRequiredError, NoSessionError, RefreshError } from "./errors";
+import {
+  LoginRequiredError,
+  NoSessionError,
+  RefreshError,
+  RefreshTimeoutError,
+} from "./errors";
 import { mockLocation, restoreLocation } from "./testing/mock-location";
 import { getClaims } from "./utils/session-data";
 import { storageKeys } from "./utils/storage-keys";
@@ -34,6 +39,8 @@ describe("create-client", () => {
       "",
       "https://example.com/callback?code=code_123",
     );
+
+    delete (navigator as any).locks;
 
     nock.cleanAll();
   });
@@ -273,6 +280,16 @@ describe("create-client", () => {
         });
 
       return { scope };
+    }
+
+    function installLockTimeout() {
+      Object.defineProperty(navigator, "locks", {
+        value: {
+          request: () =>
+            Promise.reject(new DOMException("Signal timed out.", "AbortError")),
+        },
+        configurable: true,
+      });
     }
 
     describe("signIn", () => {
@@ -964,6 +981,87 @@ describe("create-client", () => {
           scope.done();
         });
 
+        it("returns the existing token when lock times out and token is unexpired", async () => {
+          const now = Date.now();
+          const { scope } = nockRefresh({
+            accessTokenClaims: {
+              iat: now,
+              exp: now + 60,
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            onBeforeAutoRefresh: () => false,
+            refreshBufferInterval: 120,
+          });
+          scope.done();
+
+          installLockTimeout();
+
+          const accessToken = await client.getAccessToken();
+          expect(accessToken).toMatch(/^eyJ/);
+        });
+
+        it("throws RefreshTimeoutError when lock times out twice and token is expired", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          installLockTimeout();
+
+          await expect(client.getAccessToken()).rejects.toThrow(
+            RefreshTimeoutError,
+          );
+        });
+
+        it("retries and succeeds when lock times out once then resolves", async () => {
+          const client = await clientWithExpiredAccessToken();
+
+          let callCount = 0;
+          Object.defineProperty(navigator, "locks", {
+            value: {
+              request: (_name: string, _opts: any, cb: any) => {
+                callCount++;
+                if (callCount === 1) {
+                  return Promise.reject(
+                    new DOMException("Signal timed out.", "AbortError"),
+                  );
+                }
+                return cb({ name: _name, mode: "exclusive" });
+              },
+            },
+            configurable: true,
+          });
+
+          const { scope } = nockRefresh();
+          const accessToken = await client.getAccessToken();
+          expect(accessToken).toMatch(/^eyJ/);
+          expect(callCount).toBe(2);
+          scope.done();
+        });
+
+        it("throws RefreshTimeoutError on forceRefresh even with unexpired token", async () => {
+          const now = Date.now();
+          const { scope } = nockRefresh({
+            accessTokenClaims: {
+              iat: now,
+              exp: now + 60,
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            onBeforeAutoRefresh: () => false,
+            refreshBufferInterval: 120,
+          });
+          scope.done();
+
+          installLockTimeout();
+
+          await expect(
+            client.getAccessToken({ forceRefresh: true }),
+          ).rejects.toThrow(RefreshTimeoutError);
+        });
+
         it("throws an error if the fetch fails", async () => {
           const consoleDebugSpy = jest
             .spyOn(console, "debug")
@@ -1047,6 +1145,26 @@ describe("create-client", () => {
           organizationId: "org_123abc",
           state: { returnTo: "/somewhere" },
         });
+      });
+
+      it("does not throw when lock acquisition times out", async () => {
+        const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
+        const { scope: createClientScope } = nockRefresh();
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+          onBeforeAutoRefresh: () => false,
+        });
+        createClientScope.done();
+
+        installLockTimeout();
+
+        await expect(
+          client.switchToOrganization({ organizationId: "org_123abc" }),
+        ).resolves.toBeUndefined();
+
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          "Couldn't switch organization: lock acquisition timed out.",
+        );
       });
     });
   });

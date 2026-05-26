@@ -15,7 +15,12 @@ import {
 } from "./utils";
 import { getRefreshToken, getClaims } from "./utils/session-data";
 import { RedirectParams } from "./interfaces/create-client-options.interface";
-import { LoginRequiredError, NoSessionError, RefreshError } from "./errors";
+import {
+  LoginRequiredError,
+  NoSessionError,
+  RefreshError,
+  RefreshTimeoutError,
+} from "./errors";
 import { withLock, LockError } from "./utils/locking";
 import { HttpClient } from "./http-client";
 
@@ -211,7 +216,21 @@ export class Client {
       try {
         await this.#refreshSession();
       } catch (err) {
-        if (err instanceof RefreshError) {
+        if (err instanceof RefreshTimeoutError) {
+          const token = !options?.forceRefresh
+            ? this.#getUnexpiredAccessToken()
+            : undefined;
+          if (token) return token;
+
+          try {
+            await this.#refreshSession();
+          } catch (retryErr) {
+            if (retryErr instanceof RefreshTimeoutError) throw retryErr;
+            if (retryErr instanceof RefreshError)
+              throw new LoginRequiredError();
+            throw retryErr;
+          }
+        } else if (err instanceof RefreshError) {
           throw new LoginRequiredError();
         } else {
           throw err;
@@ -328,7 +347,11 @@ An authorization_code was supplied for a login which did not originate at the ap
     try {
       await this.#refreshSession({ organizationId });
     } catch (error) {
-      if (error instanceof RefreshError) {
+      if (error instanceof RefreshTimeoutError) {
+        console.warn(
+          "Couldn't switch organization: lock acquisition timed out.",
+        );
+      } else if (error instanceof RefreshError) {
         this.signIn({ ...signInOpts, organizationId });
       } else {
         throw error;
@@ -403,7 +426,7 @@ An authorization_code was supplied for a login which did not originate at the ap
 
         // preserving the original state so that we can try again next time
         this.#state = beginningState;
-        throw error;
+        throw new RefreshTimeoutError(undefined, { cause: error });
       }
 
       if (beginningState.tag !== "INITIAL") {
@@ -489,6 +512,16 @@ An authorization_code was supplied for a login which did not originate at the ap
 
   #getAccessToken() {
     return memoryStorage.getItem(storageKeys.accessToken) as string | undefined;
+  }
+
+  #getUnexpiredAccessToken(): string | undefined {
+    const accessToken = this.#getAccessToken();
+    const expiresAt = memoryStorage.getItem(storageKeys.expiresAt) as
+      | number
+      | undefined;
+    return accessToken && expiresAt && expiresAt > Date.now()
+      ? accessToken
+      : undefined;
   }
 
   get #useCookie() {
