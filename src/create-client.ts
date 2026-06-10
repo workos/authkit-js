@@ -7,6 +7,7 @@ import {
 import { NoClientIdProvidedException } from "./exceptions";
 import {
   isRedirectCallback,
+  isSafeRedirectUrl,
   memoryStorage,
   createPkceChallenge,
   setSessionData,
@@ -176,6 +177,19 @@ export class Client {
 
         return Promise.reject(new NoSessionError());
       }
+      // With no active session there is no logout URL to route through, so we
+      // navigate directly to `returnTo`. That bypasses the WorkOS logout
+      // allowlist, so reject script-bearing schemes (javascript:, data:, …)
+      // here to keep this from becoming an XSS sink.
+      if (!isSafeRedirectUrl(returnTo, window.location.origin)) {
+        const error = new Error(
+          `signOut: refusing to navigate to unsafe returnTo URL "${returnTo}". Only http(s) and relative URLs are allowed.`,
+        );
+        if (navigate) {
+          throw error;
+        }
+        return Promise.reject(error);
+      }
       if (navigate) {
         window.location.assign(returnTo);
         return;
@@ -264,7 +278,18 @@ export class Client {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
-    const state = stateParam ? JSON.parse(stateParam) : undefined;
+    // `state` round-trips through the redirect as untrusted URL input, so a
+    // crafted link can carry a non-JSON value. Treat a malformed state as
+    // absent instead of letting JSON.parse throw out of the callback (which
+    // would abort the flow and skip the URL/code-verifier cleanup below).
+    let state: Record<string, any> | undefined = undefined;
+    if (stateParam) {
+      try {
+        state = JSON.parse(stateParam);
+      } catch {
+        console.warn("AuthKit: ignoring malformed `state` parameter");
+      }
+    }
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(

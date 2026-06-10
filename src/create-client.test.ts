@@ -144,6 +144,40 @@ describe("create-client", () => {
           expect(location.search).toBe("?foo=bar&baz=qux");
           nockScope.done();
         });
+
+        it("does not throw when the state param is not valid JSON", async () => {
+          history.replaceState(
+            null,
+            "",
+            "https://example.com/callback?code=code_123&state=not-json",
+          );
+          sessionStorage.setItem(storageKeys.codeVerifier, "code_verifier");
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate")
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+          const onRedirectCallback = jest.fn();
+
+          // Assigning to the outer `client` lets afterEach dispose it, clearing
+          // the scheduled auto-refresh timer so it can't leak into later tests.
+          // A throw here (e.g. JSON.parse rejecting) would fail the test.
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/callback",
+            onRedirectCallback,
+          });
+          expect(client).toBeDefined();
+
+          // Malformed state is treated as absent rather than crashing the flow,
+          // and the code is still cleared from the URL.
+          expect(onRedirectCallback).toHaveBeenCalledWith(
+            expect.objectContaining({ state: undefined }),
+          );
+          expect(location.search).toBe("");
+          nockScope.done();
+        });
       });
     });
 
@@ -733,6 +767,56 @@ describe("create-client", () => {
 
           await expect(client.signOut({ navigate: false })).rejects.toThrow(
             NoSessionError,
+          );
+        });
+
+        it("throws and does not navigate to a javascript: returnTo", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          expect(() =>
+            client.signOut({ returnTo: "javascript:alert(document.domain)" }),
+          ).toThrow(/unsafe returnTo/);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        });
+
+        it("throws and does not navigate to a data: returnTo", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          expect(() =>
+            client.signOut({
+              returnTo: "data:text/html,<script>alert(1)</script>",
+            }),
+          ).toThrow(/unsafe returnTo/);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        });
+
+        it("rejects an unsafe returnTo when navigate is false", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          await expect(
+            client.signOut({
+              returnTo: "javascript:alert(1)",
+              navigate: false,
+            }),
+          ).rejects.toThrow(/unsafe returnTo/);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
+        });
+
+        it("still navigates to a safe cross-origin returnTo", async () => {
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+          });
+
+          client.signOut({ returnTo: "https://marketing.example/bye" });
+
+          expect(jest.mocked(location.assign)).toHaveBeenCalledWith(
+            "https://marketing.example/bye",
           );
         });
       });
