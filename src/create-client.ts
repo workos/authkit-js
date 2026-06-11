@@ -169,18 +169,15 @@ export class Client {
     const { navigate = true, returnTo } = options;
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") {
-      if (!returnTo) {
-        if (navigate) {
-          throw new NoSessionError();
-        }
-
-        return Promise.reject(new NoSessionError());
-      }
+      // With no active session there is no logout URL to route through, and the
+      // WorkOS allowlist only validates `returnTo` on the logout endpoint.
+      // Redirecting to a raw `returnTo` here would be an open redirect for
+      // logged-out users, so always surface NoSessionError and let the caller
+      // decide what to do (including any redirect it deems safe).
       if (navigate) {
-        window.location.assign(returnTo);
-        return;
+        throw new NoSessionError();
       }
-      return Promise.resolve();
+      return Promise.reject(new NoSessionError());
     }
     const { sid: sessionId } = getClaims(accessToken);
 
@@ -264,7 +261,18 @@ export class Client {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
     const stateParam = url.searchParams.get("state");
-    const state = stateParam ? JSON.parse(stateParam) : undefined;
+    // `state` round-trips through the redirect as untrusted URL input, so a
+    // crafted link can carry a non-JSON value. Treat a malformed state as
+    // absent instead of letting JSON.parse throw out of the callback (which
+    // would abort the flow and skip the URL/code-verifier cleanup below).
+    let state: Record<string, any> | undefined = undefined;
+    if (stateParam) {
+      try {
+        state = JSON.parse(stateParam);
+      } catch {
+        console.warn("AuthKit: ignoring malformed `state` parameter");
+      }
+    }
 
     // grab the previously stored code verifier from session storage
     const codeVerifier = window.sessionStorage.getItem(

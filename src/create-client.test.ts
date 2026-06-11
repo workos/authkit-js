@@ -144,6 +144,40 @@ describe("create-client", () => {
           expect(location.search).toBe("?foo=bar&baz=qux");
           nockScope.done();
         });
+
+        it("does not throw when the state param is not valid JSON", async () => {
+          history.replaceState(
+            null,
+            "",
+            "https://example.com/callback?code=code_123&state=not-json",
+          );
+          sessionStorage.setItem(storageKeys.codeVerifier, "code_verifier");
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate")
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+          const onRedirectCallback = jest.fn();
+
+          // Assigning to the outer `client` lets afterEach dispose it, clearing
+          // the scheduled auto-refresh timer so it can't leak into later tests.
+          // A throw here (e.g. JSON.parse rejecting) would fail the test.
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/callback",
+            onRedirectCallback,
+          });
+          expect(client).toBeDefined();
+
+          // Malformed state is treated as absent rather than crashing the flow,
+          // and the code is still cleared from the URL.
+          expect(onRedirectCallback).toHaveBeenCalledWith(
+            expect.objectContaining({ state: undefined }),
+          );
+          expect(location.search).toBe("");
+          nockScope.done();
+        });
       });
     });
 
@@ -699,19 +733,22 @@ describe("create-client", () => {
           expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
-        it("redirects directly to returnTo when navigate is true", async () => {
+        it("throws NoSessionError instead of redirecting to returnTo", async () => {
           client = await createClient("client_123abc", {
             redirectUri: "https://example.com/",
           });
 
-          client.signOut({ returnTo: "https://example.com/logged-out" });
-
-          expect(jest.mocked(location.assign)).toHaveBeenCalledWith(
-            "https://example.com/logged-out",
-          );
+          // With no session there is no allowlisted logout URL to route
+          // through, so we never redirect to an unvalidated returnTo (that
+          // would be an open redirect for logged-out users). The caller is
+          // expected to catch NoSessionError and decide what to do.
+          expect(() =>
+            client.signOut({ returnTo: "https://example.com/logged-out" }),
+          ).toThrow(NoSessionError);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
-        it("resolves silently when navigate is false and returnTo is provided", async () => {
+        it("rejects with NoSessionError when navigate is false even if returnTo is provided", async () => {
           client = await createClient("client_123abc", {
             redirectUri: "https://example.com/",
           });
@@ -721,8 +758,7 @@ describe("create-client", () => {
               returnTo: "https://example.com/logged-out",
               navigate: false,
             }),
-          ).resolves.toBeUndefined();
-
+          ).rejects.toThrow(NoSessionError);
           expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
