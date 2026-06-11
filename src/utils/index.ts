@@ -1,5 +1,4 @@
 export { isRedirectCallback } from "./is-redirect-callback";
-export { isSafeRedirectUrl } from "./safe-redirect";
 export { memoryStorage } from "./memory-storage";
 export { createPkceChallenge } from "./pkce";
 export { setSessionData, removeSessionData } from "./session-data";

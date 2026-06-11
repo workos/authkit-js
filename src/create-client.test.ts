@@ -733,19 +733,22 @@ describe("create-client", () => {
           expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
-        it("redirects directly to returnTo when navigate is true", async () => {
+        it("throws NoSessionError instead of redirecting to returnTo", async () => {
           client = await createClient("client_123abc", {
             redirectUri: "https://example.com/",
           });
 
-          client.signOut({ returnTo: "https://example.com/logged-out" });
-
-          expect(jest.mocked(location.assign)).toHaveBeenCalledWith(
-            "https://example.com/logged-out",
-          );
+          // With no session there is no allowlisted logout URL to route
+          // through, so we never redirect to an unvalidated returnTo (that
+          // would be an open redirect for logged-out users). The caller is
+          // expected to catch NoSessionError and decide what to do.
+          expect(() =>
+            client.signOut({ returnTo: "https://example.com/logged-out" }),
+          ).toThrow(NoSessionError);
+          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
-        it("resolves silently when navigate is false and returnTo is provided", async () => {
+        it("rejects with NoSessionError when navigate is false even if returnTo is provided", async () => {
           client = await createClient("client_123abc", {
             redirectUri: "https://example.com/",
           });
@@ -755,8 +758,7 @@ describe("create-client", () => {
               returnTo: "https://example.com/logged-out",
               navigate: false,
             }),
-          ).resolves.toBeUndefined();
-
+          ).rejects.toThrow(NoSessionError);
           expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
         });
 
@@ -767,56 +769,6 @@ describe("create-client", () => {
 
           await expect(client.signOut({ navigate: false })).rejects.toThrow(
             NoSessionError,
-          );
-        });
-
-        it("throws and does not navigate to a javascript: returnTo", async () => {
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-          });
-
-          expect(() =>
-            client.signOut({ returnTo: "javascript:alert(document.domain)" }),
-          ).toThrow(/unsafe returnTo/);
-          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
-        });
-
-        it("throws and does not navigate to a data: returnTo", async () => {
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-          });
-
-          expect(() =>
-            client.signOut({
-              returnTo: "data:text/html,<script>alert(1)</script>",
-            }),
-          ).toThrow(/unsafe returnTo/);
-          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
-        });
-
-        it("rejects an unsafe returnTo when navigate is false", async () => {
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-          });
-
-          await expect(
-            client.signOut({
-              returnTo: "javascript:alert(1)",
-              navigate: false,
-            }),
-          ).rejects.toThrow(/unsafe returnTo/);
-          expect(jest.mocked(location.assign)).not.toHaveBeenCalled();
-        });
-
-        it("still navigates to a safe cross-origin returnTo", async () => {
-          client = await createClient("client_123abc", {
-            redirectUri: "https://example.com/",
-          });
-
-          client.signOut({ returnTo: "https://marketing.example/bye" });
-
-          expect(jest.mocked(location.assign)).toHaveBeenCalledWith(
-            "https://marketing.example/bye",
           );
         });
       });

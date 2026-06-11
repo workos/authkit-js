@@ -7,7 +7,6 @@ import {
 import { NoClientIdProvidedException } from "./exceptions";
 import {
   isRedirectCallback,
-  isSafeRedirectUrl,
   memoryStorage,
   createPkceChallenge,
   setSessionData,
@@ -170,31 +169,15 @@ export class Client {
     const { navigate = true, returnTo } = options;
     const accessToken = memoryStorage.getItem(storageKeys.accessToken);
     if (typeof accessToken !== "string") {
-      if (!returnTo) {
-        if (navigate) {
-          throw new NoSessionError();
-        }
-
-        return Promise.reject(new NoSessionError());
-      }
-      // With no active session there is no logout URL to route through, so we
-      // navigate directly to `returnTo`. That bypasses the WorkOS logout
-      // allowlist, so reject script-bearing schemes (javascript:, data:, …)
-      // here to keep this from becoming an XSS sink.
-      if (!isSafeRedirectUrl(returnTo, window.location.origin)) {
-        const error = new Error(
-          `signOut: refusing to navigate to unsafe returnTo URL "${returnTo}". Only http(s), protocol-relative, and relative URLs are allowed.`,
-        );
-        if (navigate) {
-          throw error;
-        }
-        return Promise.reject(error);
-      }
+      // With no active session there is no logout URL to route through, and the
+      // WorkOS allowlist only validates `returnTo` on the logout endpoint.
+      // Redirecting to a raw `returnTo` here would be an open redirect for
+      // logged-out users, so always surface NoSessionError and let the caller
+      // decide what to do (including any redirect it deems safe).
       if (navigate) {
-        window.location.assign(returnTo);
-        return;
+        throw new NoSessionError();
       }
-      return Promise.resolve();
+      return Promise.reject(new NoSessionError());
     }
     const { sid: sessionId } = getClaims(accessToken);
 
