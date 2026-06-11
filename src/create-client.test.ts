@@ -202,6 +202,36 @@ describe("create-client", () => {
 
           nockScope.done();
         });
+
+        it("does not hang when the API is unreachable and the fetch times out", async () => {
+          const originalFetch = global.fetch;
+          const timeoutError = new DOMException(
+            "The operation timed out.",
+            "TimeoutError",
+          );
+          const mockFetch = jest.fn().mockRejectedValue(timeoutError);
+          global.fetch = mockFetch;
+
+          try {
+            client = await createClient("client_123abc", {
+              devMode: false,
+              redirectUri: "https://example.com/",
+            });
+
+            // initialize() has a catch-all around #refreshSession, so
+            // createClient should resolve even though the fetch failed
+            // (rather than hanging forever, as it would with no timeout).
+            expect(client).toBeDefined();
+            expect(client.getUser()).toBeNull();
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            // verify the request had an AbortSignal attached for the timeout
+            const fetchOptions = mockFetch.mock.calls[0][1];
+            expect(fetchOptions.signal).toBeInstanceOf(AbortSignal);
+          } finally {
+            global.fetch = originalFetch;
+          }
+        });
       });
 
       describe("when devMode is true", () => {
