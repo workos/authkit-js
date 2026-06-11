@@ -38,9 +38,16 @@ export interface RedirectParams extends AuthenticationResponse {
    * ```ts
    * onRedirectCallback={({ state }) => {
    *   if (typeof state?.returnTo !== "string") return;
-   *   const url = new URL(state.returnTo, window.location.origin);
+   *   let url;
+   *   try {
+   *     url = new URL(state.returnTo, window.location.origin);
+   *   } catch {
+   *     return; // malformed URL — ignore
+   *   }
+   *   // Navigate to the origin-validated absolute URL, not a value rebuilt from
+   *   // url.pathname — a "//evil.com" pathname would redirect off-site.
    *   if (url.origin === window.location.origin) {
-   *     window.location.href = url.pathname + url.search + url.hash;
+   *     window.location.href = url.href;
    *   }
    * }}
    * ```

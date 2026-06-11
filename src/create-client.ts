@@ -183,7 +183,7 @@ export class Client {
       // here to keep this from becoming an XSS sink.
       if (!isSafeRedirectUrl(returnTo, window.location.origin)) {
         const error = new Error(
-          `signOut: refusing to navigate to unsafe returnTo URL "${returnTo}". Only http(s) and relative URLs are allowed.`,
+          `signOut: refusing to navigate to unsafe returnTo URL "${returnTo}". Only http(s), protocol-relative, and relative URLs are allowed.`,
         );
         if (navigate) {
           throw error;
