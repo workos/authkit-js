@@ -1,4 +1,6 @@
+import { RefreshError } from "./errors";
 import { HttpClient } from "./http-client";
+import nock from "nock";
 
 describe("HttpClient", () => {
   let httpClient: HttpClient;
@@ -6,6 +8,94 @@ describe("HttpClient", () => {
   beforeEach(() => {
     httpClient = new HttpClient({
       clientId: "123",
+    });
+  });
+
+  afterEach(() => {
+    nock.cleanAll();
+  });
+
+  describe("authenticateWithRefreshToken", () => {
+    const refresh = () =>
+      httpClient.authenticateWithRefreshToken({
+        refreshToken: "refresh_token",
+        useCookie: false,
+      });
+
+    it.each([
+      ["a rate limit", 429, "too_many_requests"],
+      ["a server error", 500, "server_error"],
+      ["a bad gateway", 502, undefined],
+      ["a service unavailable", 503, undefined],
+      ["a gateway timeout", 504, undefined],
+      ["a request timeout", 408, undefined],
+    ])(
+      "throws a transient RefreshError for %s (%i)",
+      async (_label, status, errorCode) => {
+        nock("https://api.workos.com")
+          .post("/user_management/authenticate")
+          .reply(status, {
+            ...(errorCode && { error: errorCode }),
+            error_description: "Could not process refresh token.",
+          });
+
+        await expect(refresh()).rejects.toMatchObject({
+          name: "RefreshError",
+          status,
+          isTransient: true,
+        });
+      },
+    );
+
+    it("throws a transient RefreshError when a 5xx has a non-JSON body", async () => {
+      nock("https://api.workos.com")
+        .post("/user_management/authenticate")
+        .reply(503, "<html>Service Unavailable</html>", {
+          "content-type": "text/html",
+        });
+
+      await expect(refresh()).rejects.toMatchObject({
+        name: "RefreshError",
+        status: 503,
+        isTransient: true,
+      });
+    });
+
+    it("throws a terminal RefreshError for a 400 invalid_grant", async () => {
+      nock("https://api.workos.com")
+        .post("/user_management/authenticate")
+        .reply(400, {
+          error: "invalid_grant",
+          error_description: "Session has already ended.",
+        });
+
+      await expect(refresh()).rejects.toMatchObject({
+        name: "RefreshError",
+        status: 400,
+        error: "invalid_grant",
+        isTransient: false,
+      });
+    });
+
+    it("throws a terminal RefreshError for a 401", async () => {
+      nock("https://api.workos.com")
+        .post("/user_management/authenticate")
+        .reply(401, {});
+
+      const error = await refresh().catch((e) => e);
+      expect(error).toBeInstanceOf(RefreshError);
+      expect(error.isTransient).toBe(false);
+    });
+
+    it("does not wrap a network failure in a RefreshError", async () => {
+      nock("https://api.workos.com")
+        .post("/user_management/authenticate")
+        .replyWithError(new TypeError("fetch failed"));
+
+      // A raw fetch failure propagates unchanged; create-client treats a
+      // non-RefreshError as transient and preserves the session.
+      const error = await refresh().catch((e) => e);
+      expect(error).not.toBeInstanceOf(RefreshError);
     });
   });
 

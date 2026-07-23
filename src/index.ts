@@ -11,5 +11,6 @@ export {
   AuthKitError,
   LoginRequiredError,
   NoSessionError,
+  RefreshError,
   RefreshTimeoutError,
 } from "./errors";

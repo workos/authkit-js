@@ -8,6 +8,16 @@ import { toQueryString } from "./utils";
 
 const DEFAULT_HOSTNAME = "api.workos.com";
 
+// HTTP statuses that indicate a transient failure rather than a dead refresh
+// token: request timeouts (408), rate limits (429), and 5xx. On these the
+// session should be preserved and the refresh retried.
+const RETRYABLE_REFRESH_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+
+interface AuthenticationErrorResponse {
+  error?: string;
+  error_description?: string;
+}
+
 export class HttpClient {
   readonly #baseUrl: string;
   readonly #clientId: string;
@@ -51,9 +61,26 @@ export class HttpClient {
     if (response.ok) {
       const data = (await response.json()) as AuthenticationResponseRaw;
       return deserializeAuthenticationResponse(data);
-    } else {
-      const error = (await response.json()) as any;
-      throw new RefreshError(error.error_description);
+    }
+
+    const { status } = response;
+    const body = await this.#parseErrorBody(response);
+    throw new RefreshError(body.error_description, {
+      status,
+      error: body.error,
+      isTransient: RETRYABLE_REFRESH_STATUS_CODES.has(status),
+    });
+  }
+
+  async #parseErrorBody(
+    response: Response,
+  ): Promise<AuthenticationErrorResponse> {
+    try {
+      return (await response.json()) as AuthenticationErrorResponse;
+    } catch {
+      // A 5xx (or gateway) response may carry a non-JSON body; treat it as an
+      // empty error payload so the status still drives classification.
+      return {};
     }
   }
 

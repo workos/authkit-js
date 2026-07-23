@@ -223,11 +223,18 @@ export class Client {
             await this.#refreshSession();
           } catch (retryErr) {
             if (retryErr instanceof RefreshTimeoutError) throw retryErr;
-            if (retryErr instanceof RefreshError)
+            if (retryErr instanceof RefreshError) {
+              // A transient failure preserves the session; surface it so the
+              // caller can retry rather than forcing re-authentication.
+              if (retryErr.isTransient) throw retryErr;
               throw new LoginRequiredError();
+            }
             throw retryErr;
           }
         } else if (err instanceof RefreshError) {
+          // A transient failure preserves the session; surface it so the caller
+          // can retry rather than forcing re-authentication.
+          if (err.isTransient) throw err;
           throw new LoginRequiredError();
         } else {
           throw err;
@@ -360,6 +367,11 @@ An authorization_code was supplied for a login which did not originate at the ap
           "Couldn't switch organization: lock acquisition timed out.",
         );
       } else if (error instanceof RefreshError) {
+        // A transient failure preserves the session; surface it so the caller
+        // can retry rather than forcing a full re-authentication redirect.
+        if (error.isTransient) {
+          throw error;
+        }
         this.signIn({ ...signInOpts, organizationId });
       } else {
         throw error;
@@ -441,7 +453,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         console.debug(error);
       }
 
-      if (error instanceof RefreshError) {
+      if (error instanceof RefreshError && !error.isTransient) {
         removeSessionData({ devMode: this.#devMode, clientId: this.#clientId });
         sessionStorage.removeItem(orgIdKey(this.#clientId));
         sessionStorage.removeItem(LEGACY_ORG_ID_KEY);
@@ -454,8 +466,10 @@ An authorization_code was supplied for a login which did not originate at the ap
 
         this.#state = { tag: "ERROR" };
       } else {
-        // transitioning into the AUTHENTICATED state ensures that we will
-        // attempt to refresh the token on future getAccessToken calls()
+        // A transient failure (network error, timeout, 429, or 5xx) is not a
+        // signal that the refresh token is dead, so preserve the session data.
+        // Transitioning into the AUTHENTICATED state ensures that we will
+        // attempt to refresh the token on future getAccessToken() calls.
         //
         // this could maybe be a new state for clarity? TEMPORARY_ERROR?
         this.#state = { tag: "AUTHENTICATED" };

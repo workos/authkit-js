@@ -1017,6 +1017,64 @@ describe("create-client", () => {
           scope.done();
         });
 
+        it.each([
+          ["a rate limit", 429],
+          ["a server error", 500],
+          ["a service unavailable", 503],
+          ["a gateway timeout", 504],
+          ["a request timeout", 408],
+        ])(
+          "preserves the session on a transient refresh failure: %s (%i)",
+          async (_label, status) => {
+            const consoleDebugSpy = jest
+              .spyOn(console, "debug")
+              .mockImplementation();
+            const onRefreshFailure = jest.fn();
+            const now = Date.now();
+            const { scope: initialRefreshScope } = nockRefresh({
+              accessTokenClaims: {
+                iat: now,
+                exp: now,
+                jti: "initial-access-token",
+              },
+            });
+            client = await createClient("client_123abc", {
+              redirectUri: "https://example.com/",
+              onBeforeAutoRefresh: () => false,
+              onRefreshFailure,
+            });
+            initialRefreshScope.done();
+            sessionStorage.setItem("workos-org-id:client_123abc", "org_123abc");
+
+            const scope = nock("https://api.workos.com")
+              .post("/user_management/authenticate", {
+                client_id: "client_123abc",
+                grant_type: "refresh_token",
+              })
+              .reply(status, {
+                error: "too_many_requests",
+                error_description: "Could not process refresh token.",
+              });
+
+            // A transient failure surfaces the RefreshError (not a
+            // LoginRequiredError) so the caller can retry.
+            const error = await client.getAccessToken().catch((e) => e);
+            expect(error).toBeInstanceOf(RefreshError);
+            expect(error).not.toBeInstanceOf(LoginRequiredError);
+            expect(error.isTransient).toBe(true);
+
+            // The session is preserved: storage is untouched and the refresh
+            // failure callback is not fired.
+            expect(sessionStorage.getItem("workos-org-id:client_123abc")).toBe(
+              "org_123abc",
+            );
+            expect(onRefreshFailure).not.toHaveBeenCalled();
+
+            scope.done();
+            consoleDebugSpy.mockRestore();
+          },
+        );
+
         it("returns the existing token when lock times out and token is unexpired", async () => {
           const now = Date.now();
           const { scope } = nockRefresh({
