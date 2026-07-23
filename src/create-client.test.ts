@@ -1310,6 +1310,38 @@ describe("create-client", () => {
         });
       });
 
+      it("surfaces a transient failure instead of redirecting to sign-in", async () => {
+        const { scope: createClientScope } = nockRefresh();
+        client = await createClient("client_123abc", {
+          redirectUri: "https://example.com/",
+        });
+        createClientScope.done();
+
+        const organizationId = "org_123abc";
+        const switchToOrgScope = nock("https://api.workos.com")
+          .post("/user_management/authenticate", {
+            client_id: "client_123abc",
+            grant_type: "refresh_token",
+            organization_id: organizationId,
+          })
+          .reply(503, {
+            error: "too_many_requests",
+            error_description: "Could not process refresh token.",
+          });
+        const signInSpy = jest.spyOn(client, "signIn").mockImplementation();
+        jest.spyOn(console, "debug").mockImplementation();
+
+        const error = await client
+          .switchToOrganization({ organizationId })
+          .catch((e) => e);
+        switchToOrgScope.done();
+
+        expect(error).toBeInstanceOf(RefreshError);
+        expect(error.isTransient).toBe(true);
+        // The still-valid session is preserved: no forced re-authentication.
+        expect(signInSpy).not.toHaveBeenCalled();
+      });
+
       it("does not throw when lock acquisition times out", async () => {
         const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
         const { scope: createClientScope } = nockRefresh();
