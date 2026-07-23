@@ -129,8 +129,12 @@ export class Client {
         await this.#refreshSession();
         this.#scheduleAutomaticRefresh();
       } catch {
-        // this is expected to fail if a user doesn't
-        // have a session. do nothing.
+        // A refresh here is expected to fail if the user has no session, in
+        // which case #doRefresh moves to the ERROR state and we do nothing.
+        // For a transient failure (network error, timeout, 429, 5xx) the
+        // session is preserved (state stays AUTHENTICATED), so still start the
+        // background refresh loop to renew the token once the blip clears.
+        this.#scheduleAutomaticRefreshIfAuthenticated();
       }
     }
   }
@@ -223,11 +227,28 @@ export class Client {
             await this.#refreshSession();
           } catch (retryErr) {
             if (retryErr instanceof RefreshTimeoutError) throw retryErr;
-            if (retryErr instanceof RefreshError)
+            if (retryErr instanceof RefreshError) {
+              // A transient failure preserves the session; surface it so the
+              // caller can retry rather than forcing re-authentication.
+              if (retryErr.isTransient) throw retryErr;
               throw new LoginRequiredError();
+            }
             throw retryErr;
           }
         } else if (err instanceof RefreshError) {
+          // A transient failure preserves the session. If the refresh was
+          // proactive (the token is within the buffer window but not yet
+          // expired) and this isn't a forced refresh, return the still-valid
+          // token so a brief blip doesn't fail a serviceable call. Otherwise
+          // surface the error so the caller can retry rather than being forced
+          // to re-authenticate.
+          if (err.isTransient) {
+            const token = !options?.forceRefresh
+              ? this.#getUnexpiredAccessToken()
+              : undefined;
+            if (token) return token;
+            throw err;
+          }
           throw new LoginRequiredError();
         } else {
           throw err;
@@ -325,6 +346,12 @@ An authorization_code was supplied for a login which did not originate at the ap
     window.history.replaceState({}, "", cleanUrl);
   }
 
+  #scheduleAutomaticRefreshIfAuthenticated() {
+    if (this.#state.tag === "AUTHENTICATED") {
+      this.#scheduleAutomaticRefresh();
+    }
+  }
+
   async #scheduleAutomaticRefresh() {
     this.#refreshTimer = setTimeout(() => {
       if (this.#shouldRefresh() && this.#onBeforeAutoRefresh()) {
@@ -360,6 +387,11 @@ An authorization_code was supplied for a login which did not originate at the ap
           "Couldn't switch organization: lock acquisition timed out.",
         );
       } else if (error instanceof RefreshError) {
+        // A transient failure preserves the session; surface it so the caller
+        // can retry rather than forcing a full re-authentication redirect.
+        if (error.isTransient) {
+          throw error;
+        }
         this.signIn({ ...signInOpts, organizationId });
       } else {
         throw error;
@@ -441,7 +473,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         console.debug(error);
       }
 
-      if (error instanceof RefreshError) {
+      if (error instanceof RefreshError && !error.isTransient) {
         removeSessionData({ devMode: this.#devMode, clientId: this.#clientId });
         sessionStorage.removeItem(orgIdKey(this.#clientId));
         sessionStorage.removeItem(LEGACY_ORG_ID_KEY);
@@ -454,8 +486,10 @@ An authorization_code was supplied for a login which did not originate at the ap
 
         this.#state = { tag: "ERROR" };
       } else {
-        // transitioning into the AUTHENTICATED state ensures that we will
-        // attempt to refresh the token on future getAccessToken calls()
+        // A transient failure (network error, timeout, 429, or 5xx) is not a
+        // signal that the refresh token is dead, so preserve the session data.
+        // Transitioning into the AUTHENTICATED state ensures that we will
+        // attempt to refresh the token on future getAccessToken() calls.
         //
         // this could maybe be a new state for clarity? TEMPORARY_ERROR?
         this.#state = { tag: "AUTHENTICATED" };
