@@ -1097,6 +1097,38 @@ describe("create-client", () => {
           expect(accessToken).toMatch(/^eyJ/);
         });
 
+        it("returns the existing token when a proactive refresh hits a transient failure and token is unexpired", async () => {
+          const now = Date.now();
+          const { scope } = nockRefresh({
+            accessTokenClaims: {
+              iat: now,
+              exp: now + 60,
+            },
+          });
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            onBeforeAutoRefresh: () => false,
+            refreshBufferInterval: 120,
+          });
+          scope.done();
+
+          const transientScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(503, {
+              error: "too_many_requests",
+              error_description: "Could not process refresh token.",
+            });
+
+          const accessToken = await client.getAccessToken();
+          expect(accessToken).toMatch(/^eyJ/);
+
+          transientScope.done();
+        });
+
         it("throws RefreshTimeoutError when lock times out twice and token is expired", async () => {
           const client = await clientWithExpiredAccessToken();
 

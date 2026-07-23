@@ -232,9 +232,19 @@ export class Client {
             throw retryErr;
           }
         } else if (err instanceof RefreshError) {
-          // A transient failure preserves the session; surface it so the caller
-          // can retry rather than forcing re-authentication.
-          if (err.isTransient) throw err;
+          // A transient failure preserves the session. If the refresh was
+          // proactive (the token is within the buffer window but not yet
+          // expired) and this isn't a forced refresh, return the still-valid
+          // token so a brief blip doesn't fail a serviceable call. Otherwise
+          // surface the error so the caller can retry rather than being forced
+          // to re-authenticate.
+          if (err.isTransient) {
+            const token = !options?.forceRefresh
+              ? this.#getUnexpiredAccessToken()
+              : undefined;
+            if (token) return token;
+            throw err;
+          }
           throw new LoginRequiredError();
         } else {
           throw err;
