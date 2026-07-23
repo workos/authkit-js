@@ -1129,6 +1129,43 @@ describe("create-client", () => {
           transientScope.done();
         });
 
+        it("starts the background refresh loop when the initial refresh fails transiently", async () => {
+          const consoleDebugSpy = jest
+            .spyOn(console, "debug")
+            .mockImplementation();
+
+          // The initial refresh during initialize() hits a transient 5xx; the
+          // session must be preserved AND the background refresh loop started.
+          const failingScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(503, {
+              error: "too_many_requests",
+              error_description: "Could not process refresh token.",
+            });
+
+          const { scope: recoveryScope } = nockRefresh();
+
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            onBeforeAutoRefresh: () => true,
+          });
+
+          failingScope.done();
+          // The transient failure left no session yet.
+          expect(client.getUser()).toBeNull();
+
+          // Wait for the 1s heartbeat to fire and recover the session.
+          await new Promise((resolve) => setTimeout(resolve, 1100));
+
+          recoveryScope.done();
+          expect(client.getUser()).toEqual({ id: "user_123abc" });
+
+          consoleDebugSpy.mockRestore();
+        });
+
         it("throws RefreshTimeoutError when lock times out twice and token is expired", async () => {
           const client = await clientWithExpiredAccessToken();
 

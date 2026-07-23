@@ -129,8 +129,12 @@ export class Client {
         await this.#refreshSession();
         this.#scheduleAutomaticRefresh();
       } catch {
-        // this is expected to fail if a user doesn't
-        // have a session. do nothing.
+        // A refresh here is expected to fail if the user has no session, in
+        // which case #doRefresh moves to the ERROR state and we do nothing.
+        // For a transient failure (network error, timeout, 429, 5xx) the
+        // session is preserved (state stays AUTHENTICATED), so still start the
+        // background refresh loop to renew the token once the blip clears.
+        this.#scheduleAutomaticRefreshIfAuthenticated();
       }
     }
   }
@@ -340,6 +344,12 @@ An authorization_code was supplied for a login which did not originate at the ap
     cleanUrl.searchParams.delete("state");
     window.sessionStorage.removeItem(storageKeys.codeVerifier);
     window.history.replaceState({}, "", cleanUrl);
+  }
+
+  #scheduleAutomaticRefreshIfAuthenticated() {
+    if (this.#state.tag === "AUTHENTICATED") {
+      this.#scheduleAutomaticRefresh();
+    }
   }
 
   async #scheduleAutomaticRefresh() {
