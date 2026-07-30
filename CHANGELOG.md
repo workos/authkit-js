@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.2](https://github.com/workos/authkit-js/compare/v0.20.1...v0.20.2) (2026-07-23)
+
+
+### Bug Fixes
+
+* bump ws from 8.18.0 to 8.21.0 ([#128](https://github.com/workos/authkit-js/issues/128)) ([6d35a01](https://github.com/workos/authkit-js/commit/6d35a01cd2ff87ac4560d39c17c273adec61fb5e))
+* Preserve session on transient refresh failures ([#130](https://github.com/workos/authkit-js/issues/130)) ([e3d5188](https://github.com/workos/authkit-js/commit/e3d5188218060223d42661dd7d5f7df3cdfa85a5))
+
 ## [0.20.1](https://github.com/workos/authkit-js/compare/v0.20.0...v0.20.1) (2026-06-11)
 
 
