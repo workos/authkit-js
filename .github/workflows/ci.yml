@@ -30,9 +30,6 @@ jobs:
       - name: Setup
         run: npm ci
 
-      - name: Remove Socket Firewall credentials before executing source
-        uses: workos/setup-socket-firewall/teardown@ca93dd8aa351f54f4729fe3377a9be23c631c25d # v1
-
       - name: Format
         run: npm run format:check
 
