@@ -182,6 +182,34 @@ describe("create-client", () => {
     });
 
     describe("when the current route does not have a `code`", () => {
+      describe("when a second `workos-has-session` cookie shadows ours", () => {
+        it("looks for the client_id in all cookies", async () => {
+          // Two auth hosts at different subdomain depths each scoped the cookie
+          // to their own parent domain, so the browser sends both.
+          cookieMock.mockReturnValue(
+            "workos-has-session=client_other; workos-has-session=client_123abc",
+          );
+
+          const nockScope = nock("https://api.workos.com")
+            .post("/user_management/authenticate", {
+              client_id: "client_123abc",
+              grant_type: "refresh_token",
+            })
+            .reply(200, {
+              user: {},
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            });
+
+          client = await createClient("client_123abc", {
+            devMode: false,
+            redirectUri: "https://example.com/",
+          });
+
+          nockScope.done();
+        });
+      });
+
       describe("when there is a `workos-has-session cookie", () => {
         it("refreshes the existing session", async () => {
           const nockScope = nock("https://api.workos.com")
