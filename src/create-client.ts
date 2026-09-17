@@ -53,11 +53,20 @@ function orgIdKey(clientId: string) {
 const REFRESH_LOCK_NAME = "WORKOS_REFRESH_SESSION";
 
 function hasSessionCookie(clientId: string): boolean {
-  const match = document.cookie.match(/(?:^|;\s*)workos-has-session=([^;]*)/);
-  if (!match) return false;
-  const cookieValue = match[1];
-  // cookieValue == 1 is for backwards compat. can remove this in 400 days
-  return cookieValue === "1" ? true : cookieValue.split(".").includes(clientId);
+  // One domain potentially holds several cookies of this name at different
+  // levels (e.g. app.example.com and admin.internal.example.com).
+  const matches = document.cookie.matchAll(
+    /(?:^|;\s*)workos-has-session=([^;]*)/g,
+  );
+
+  for (const [, cookieValue] of matches) {
+    // cookieValue == 1 is for backwards compat. can remove in april 2027
+    if (cookieValue === "1" || cookieValue.split(".").includes(clientId)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export class Client {
