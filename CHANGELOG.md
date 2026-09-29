@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.4](https://github.com/workos/authkit-js/compare/v0.20.3...v0.20.4) (2026-09-29)
+
+
+### Bug Fixes
+
+* stop session refresh after sign-out ([#141](https://github.com/workos/authkit-js/issues/141)) ([040a8e7](https://github.com/workos/authkit-js/commit/040a8e7e259f1b2393abc2f9421ee340a4f73d0d))
+
 ## [0.20.3](https://github.com/workos/authkit-js/compare/v0.20.2...v0.20.3) (2026-09-17)
 
 
