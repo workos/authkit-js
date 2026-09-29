@@ -42,6 +42,7 @@ type State =
   | { tag: "INITIAL" }
   | { tag: "AUTHENTICATING"; response: Promise<AuthenticationResponse> }
   | { tag: "AUTHENTICATED" }
+  | { tag: "SIGNED_OUT" }
   | { tag: "ERROR" };
 
 const LEGACY_ORG_ID_KEY = "workos_organization_id";
@@ -200,6 +201,8 @@ export class Client {
     });
 
     if (url) {
+      this.#state = { tag: "SIGNED_OUT" };
+      clearTimeout(this.#refreshTimer);
       removeSessionData({ devMode: this.#devMode, clientId: this.#clientId });
       sessionStorage.removeItem(orgIdKey(this.#clientId));
       sessionStorage.removeItem(LEGACY_ORG_ID_KEY);
@@ -362,11 +365,13 @@ An authorization_code was supplied for a login which did not originate at the ap
   }
 
   async #scheduleAutomaticRefresh() {
+    if (this.#state.tag === "SIGNED_OUT") return;
+
     this.#refreshTimer = setTimeout(() => {
       if (this.#shouldRefresh() && this.#onBeforeAutoRefresh()) {
         this.#refreshSession()
           .catch((e) => {
-            console.debug(e);
+            if (this.#state.tag !== "SIGNED_OUT") console.debug(e);
           })
           .finally(() => this.#scheduleAutomaticRefresh());
       } else {
@@ -409,6 +414,7 @@ An authorization_code was supplied for a login which did not originate at the ap
   }
 
   async #refreshSession({ organizationId }: { organizationId?: string } = {}) {
+    this.#assertNotSignedOut();
     if (this.#state.tag === "AUTHENTICATING") {
       await this.#state.response;
       return;
@@ -433,6 +439,7 @@ An authorization_code was supplied for a login which did not originate at the ap
   }): Promise<AuthenticationResponse> {
     try {
       return await withLock(REFRESH_LOCK_NAME, async () => {
+        this.#assertNotSignedOut();
         if (organizationId) {
           sessionStorage.setItem(orgIdKey(this.#clientId), organizationId);
         } else {
@@ -458,6 +465,8 @@ An authorization_code was supplied for a login which did not originate at the ap
             useCookie: this.#useCookie,
           });
 
+        // Logout may have happened while the refresh request was in flight.
+        this.#assertNotSignedOut();
         this.#state = { tag: "AUTHENTICATED" };
         setSessionData(authenticationResponse, {
           devMode: this.#devMode,
@@ -467,6 +476,7 @@ An authorization_code was supplied for a login which did not originate at the ap
         return authenticationResponse;
       });
     } catch (error) {
+      this.#assertNotSignedOut();
       if (
         error instanceof LockError &&
         error.name === "AcquisitionTimeoutError"
@@ -508,11 +518,16 @@ An authorization_code was supplied for a login which did not originate at the ap
     }
   }
 
+  #assertNotSignedOut() {
+    if (this.#state.tag === "SIGNED_OUT") throw new LoginRequiredError();
+  }
+
   #shouldRefresh() {
     switch (this.#state.tag) {
       case "INITIAL":
       case "AUTHENTICATING":
         return true;
+      case "SIGNED_OUT":
       case "ERROR":
         return false;
       case "AUTHENTICATED":

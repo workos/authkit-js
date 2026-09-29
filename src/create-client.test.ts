@@ -533,6 +533,168 @@ describe("create-client", () => {
         restoreLocation();
       });
 
+      describe("refresh cleanup", () => {
+        let fetchMock: jest.SpiedFunction<typeof fetch>;
+        let onRefresh: jest.Mock;
+        let onRefreshFailure: jest.Mock;
+        const refreshTokenKey = `${storageKeys.refreshToken}:client_123abc`;
+        const refreshResponse = () =>
+          new Response(
+            JSON.stringify({
+              user: { id: "user_123abc" },
+              access_token: mockAccessToken(),
+              refresh_token: "refresh_token",
+            }),
+          );
+
+        beforeEach(async () => {
+          jest.useFakeTimers();
+          Object.defineProperty(navigator, "locks", {
+            configurable: true,
+            value: {
+              request: (_name: string, _options: any, callback: any) =>
+                callback(),
+            },
+          });
+          jest.spyOn(console, "debug").mockImplementation();
+          fetchMock = jest
+            .spyOn(global, "fetch")
+            .mockImplementation(async () => refreshResponse());
+          onRefresh = jest.fn();
+          onRefreshFailure = jest.fn();
+          client = await createClient("client_123abc", {
+            redirectUri: "https://example.com/",
+            devMode: true,
+            onBeforeAutoRefresh: () => true,
+            onRefresh,
+            onRefreshFailure,
+          });
+          fetchMock.mockClear();
+          onRefresh.mockClear();
+        });
+
+        afterEach(() => {
+          client?.dispose();
+          jest.useRealTimers();
+          localStorage.removeItem(refreshTokenKey);
+        });
+
+        it("still refreshes automatically before logout", async () => {
+          jest.setSystemTime(Date.now() + 3600_000);
+          await jest.advanceTimersByTimeAsync(1000);
+
+          expect(fetchMock).toHaveBeenCalledTimes(1);
+          expect(onRefresh).toHaveBeenCalledTimes(1);
+          expect(client.getUser()).toMatchObject({ id: "user_123abc" });
+          expect(jest.getTimerCount()).toBe(1);
+        });
+
+        it.each([true, false])(
+          "stops the refresh timer with navigate=%s",
+          async (navigate) => {
+            if (navigate) {
+              client.signOut();
+            } else {
+              await client.signOut({ navigate: false });
+            }
+            fetchMock.mockClear();
+
+            await jest.advanceTimersByTimeAsync(5000);
+
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(client.getUser()).toBeNull();
+            expect(localStorage.getItem(refreshTokenKey)).toBeNull();
+            expect(onRefresh).not.toHaveBeenCalled();
+            expect(jest.getTimerCount()).toBe(0);
+          },
+        );
+
+        it("rejects explicit refreshes after logout without making requests", async () => {
+          client.signOut();
+
+          await expect(client.getAccessToken()).rejects.toThrow(
+            LoginRequiredError,
+          );
+          await expect(
+            client.getAccessToken({ forceRefresh: true }),
+          ).rejects.toThrow(LoginRequiredError);
+          await expect(
+            client.switchToOrganization({ organizationId: "org_123abc" }),
+          ).rejects.toThrow(LoginRequiredError);
+
+          expect(fetchMock).not.toHaveBeenCalled();
+          expect(
+            sessionStorage.getItem("workos-org-id:client_123abc"),
+          ).toBeNull();
+        });
+
+        it.each([200, 400, 503])(
+          "does not restore the session or timer when an in-flight refresh returns %i after logout",
+          async (status) => {
+            let completeRefresh!: (response: Response) => void;
+            fetchMock.mockReturnValueOnce(
+              new Promise((resolve) => {
+                completeRefresh = resolve;
+              }),
+            );
+            jest.setSystemTime(Date.now() + 3600_000);
+            await jest.advanceTimersByTimeAsync(1000);
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+
+            client.signOut();
+            completeRefresh(
+              status === 200
+                ? refreshResponse()
+                : new Response(
+                    JSON.stringify({ error_description: "Refresh failed" }),
+                    { status },
+                  ),
+            );
+            await jest.advanceTimersByTimeAsync(5000);
+
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+            expect(client.getUser()).toBeNull();
+            expect(localStorage.getItem(refreshTokenKey)).toBeNull();
+            expect(onRefresh).not.toHaveBeenCalled();
+            expect(onRefreshFailure).not.toHaveBeenCalled();
+            expect(console.debug).not.toHaveBeenCalled();
+            expect(jest.getTimerCount()).toBe(0);
+            await expect(
+              client.getAccessToken({ forceRefresh: true }),
+            ).rejects.toThrow(LoginRequiredError);
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+          },
+        );
+
+        it.each([false, true])(
+          "does not resume a refresh waiting for the lock after logout (timeout=%s)",
+          async (timeout) => {
+            let releaseLock!: () => void;
+            jest.spyOn(navigator.locks, "request").mockImplementationOnce(
+              (_name, _options, callback: any) =>
+                new Promise((resolve, reject) => {
+                  releaseLock = () =>
+                    timeout
+                      ? reject(new DOMException("Timed out", "AbortError"))
+                      : resolve(callback());
+                }),
+            );
+            const refresh = expect(
+              client.getAccessToken({ forceRefresh: true }),
+            ).rejects.toThrow(LoginRequiredError);
+
+            client.signOut();
+            releaseLock();
+            await refresh;
+            await jest.advanceTimersByTimeAsync(5000);
+
+            expect(fetchMock).not.toHaveBeenCalled();
+            expect(client.getUser()).toBeNull();
+            expect(jest.getTimerCount()).toBe(0);
+          },
+        );
+      });
+
       it("redirects to the logout URL", async () => {
         const { scope } = nockRefresh();
 
