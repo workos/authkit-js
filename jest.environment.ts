@@ -15,6 +15,9 @@ export default class CustomEnvironment extends JsDomEnvironment {
       // that does not implement `timeout`. This workaround can be removed when jest@30
       // is released as it depends on jsdom@22 which _does_ implement `timeout`.
       AbortSignal,
+      // jsdom's `AbortController` creates jsdom `AbortSignal`s, which Node's
+      // `fetch` rejects, so use Node's implementation alongside it.
+      AbortController,
 
       // JSDOM does not implement `fetch`, so we re-use Node's implementation.
       fetch,

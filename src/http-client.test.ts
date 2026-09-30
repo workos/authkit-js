@@ -2,6 +2,15 @@ import { RefreshError } from "./errors";
 import { HttpClient } from "./http-client";
 import nock from "nock";
 
+// A fetch that never settles unless aborted, as on a stale connection.
+const hungFetch = (_url: RequestInfo | URL, init?: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+  });
+
+const isPending = (promise: Promise<unknown>) =>
+  Promise.race([promise.then(() => false), Promise.resolve().then(() => true)]);
+
 describe("HttpClient", () => {
   let httpClient: HttpClient;
 
@@ -96,6 +105,71 @@ describe("HttpClient", () => {
       // non-RefreshError as transient and preserves the session.
       const error = await refresh().catch((e) => e);
       expect(error).not.toBeInstanceOf(RefreshError);
+    });
+
+    describe("when the request does not settle", () => {
+      beforeEach(() => {
+        jest.useFakeTimers();
+      });
+
+      afterEach(() => {
+        jest.useRealTimers();
+      });
+
+      it("aborts a request that never responds after 8 seconds", async () => {
+        jest.spyOn(global, "fetch").mockImplementation(hungFetch);
+
+        const pending = refresh().catch((e) => e);
+        await jest.advanceTimersByTimeAsync(7_999);
+        expect(await isPending(pending)).toBe(true);
+
+        await jest.advanceTimersByTimeAsync(1);
+        const error = await pending;
+        // An abort is not a RefreshError, so create-client treats it as
+        // transient and preserves the session.
+        expect(error.name).toBe("AbortError");
+        expect(error).not.toBeInstanceOf(RefreshError);
+      });
+
+      it("aborts a request whose body never finishes", async () => {
+        // Headers arrive but the body never does. As in browsers, aborting the
+        // request errors the in-progress body read.
+        jest.spyOn(global, "fetch").mockImplementation(async (_url, init) => {
+          const body = new ReadableStream({
+            start(controller) {
+              init?.signal?.addEventListener("abort", () =>
+                controller.error(init.signal!.reason),
+              );
+            },
+          });
+          return new Response(body, { status: 200 });
+        });
+
+        const pending = refresh().catch((e) => e);
+        await jest.advanceTimersByTimeAsync(8_000);
+        expect((await pending).name).toBe("AbortError");
+      });
+    });
+  });
+
+  describe("authenticateWithCode", () => {
+    it("aborts a request that never responds after 8 seconds", async () => {
+      jest.useFakeTimers();
+      try {
+        jest.spyOn(global, "fetch").mockImplementation(hungFetch);
+
+        const pending = httpClient
+          .authenticateWithCode({
+            code: "code",
+            codeVerifier: "verifier",
+            useCookie: false,
+          })
+          .catch((e) => e);
+        await jest.advanceTimersByTimeAsync(8_000);
+        expect((await pending).name).toBe("AbortError");
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
