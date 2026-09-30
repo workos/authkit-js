@@ -8,6 +8,11 @@ import { toQueryString } from "./utils";
 
 const DEFAULT_HOSTNAME = "api.workos.com";
 
+// Kept below the refresh lock's acquisition timeout (10s) so a request that
+// never settles (e.g. on a stale connection after the device sleeps) releases
+// the cross-tab refresh lock before other tabs give up waiting for it.
+const REQUEST_TIMEOUT_MS = 8_000;
+
 // HTTP statuses that indicate a transient failure rather than a dead refresh
 // token: request timeouts (408), rate limits (429), and 5xx. On these the
 // session should be preserved and the refresh retried.
@@ -48,27 +53,30 @@ export class HttpClient {
     organizationId?: string;
     useCookie: boolean;
   }) {
-    const response = await this.#post("/user_management/authenticate", {
-      useCookie,
-      body: {
-        client_id: this.#clientId,
-        grant_type: "refresh_token",
-        ...(!useCookie && { refresh_token: refreshToken }),
-        organization_id: organizationId,
-      },
-    });
+    return this.#withTimeout(async (signal) => {
+      const response = await this.#post("/user_management/authenticate", {
+        useCookie,
+        signal,
+        body: {
+          client_id: this.#clientId,
+          grant_type: "refresh_token",
+          ...(!useCookie && { refresh_token: refreshToken }),
+          organization_id: organizationId,
+        },
+      });
 
-    if (response.ok) {
-      const data = (await response.json()) as AuthenticationResponseRaw;
-      return deserializeAuthenticationResponse(data);
-    }
+      if (response.ok) {
+        const data = (await response.json()) as AuthenticationResponseRaw;
+        return deserializeAuthenticationResponse(data);
+      }
 
-    const { status } = response;
-    const body = await this.#parseErrorBody(response);
-    throw new RefreshError(body.error_description, {
-      status,
-      error: body.error,
-      isTransient: RETRYABLE_REFRESH_STATUS_CODES.has(status),
+      const { status } = response;
+      const body = await this.#parseErrorBody(response);
+      throw new RefreshError(body.error_description, {
+        status,
+        error: body.error,
+        isTransient: RETRYABLE_REFRESH_STATUS_CODES.has(status),
+      });
     });
   }
 
@@ -93,31 +101,64 @@ export class HttpClient {
     codeVerifier: string;
     useCookie: boolean;
   }) {
-    const response = await this.#post("/user_management/authenticate", {
-      useCookie,
-      body: {
-        code,
-        client_id: this.#clientId,
-        grant_type: "authorization_code",
-        code_verifier: codeVerifier,
-      },
+    return this.#withTimeout(async (signal) => {
+      const response = await this.#post("/user_management/authenticate", {
+        useCookie,
+        signal,
+        body: {
+          code,
+          client_id: this.#clientId,
+          grant_type: "authorization_code",
+          code_verifier: codeVerifier,
+        },
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as AuthenticationResponseRaw;
+        return deserializeAuthenticationResponse(data);
+      }
+
+      const error = await response.json();
+      throw new CodeExchangeError(error.error_description);
     });
+  }
 
-    if (response.ok) {
-      const data = (await response.json()) as AuthenticationResponseRaw;
-      return deserializeAuthenticationResponse(data);
+  /**
+   * Runs `request` with an abort signal that fires after `REQUEST_TIMEOUT_MS`.
+   * The timeout covers reading the response body as well as the initial fetch,
+   * since either can hang on a stale connection.
+   *
+   * A timed-out request rejects with an abort error rather than a
+   * `RefreshError`, which create-client treats as transient (the session is
+   * preserved and the refresh retried).
+   */
+  async #withTimeout<T>(
+    request: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await request(controller.signal);
+    } finally {
+      clearTimeout(timer);
     }
-
-    const error = await response.json();
-    throw new CodeExchangeError(error.error_description);
   }
 
   #post(
     path: "/user_management/authenticate",
-    { body, useCookie }: { body: Record<string, unknown>; useCookie: boolean },
+    {
+      body,
+      useCookie,
+      signal,
+    }: {
+      body: Record<string, unknown>;
+      useCookie: boolean;
+      signal: AbortSignal;
+    },
   ) {
     return fetch(new URL(path, this.#baseUrl), {
       method: "POST",
+      signal,
       ...(useCookie && { credentials: "include" }),
       headers: {
         Accept: "application/json, text/plain, */*",

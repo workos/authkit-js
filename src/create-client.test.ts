@@ -1442,6 +1442,43 @@ describe("create-client", () => {
           expect(accessToken).toMatch(/^eyJ/);
           successScope.done();
         });
+
+        it("aborts a hung refresh and preserves the session", async () => {
+          jest.spyOn(console, "debug").mockImplementation();
+          const client = await clientWithExpiredAccessToken();
+
+          // A fetch that never settles unless aborted, as on a stale connection.
+          const fetchMock = jest.spyOn(global, "fetch").mockImplementationOnce(
+            (_url, init) =>
+              new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () =>
+                  reject(init.signal!.reason),
+                );
+              }),
+          );
+
+          jest.useFakeTimers();
+          try {
+            const pending = client.getAccessToken().catch((e) => e);
+            // Other tabs wait up to 10s for the refresh lock, so the hung
+            // request must be aborted within that window.
+            await jest.advanceTimersByTimeAsync(10_000);
+            const error = await pending;
+            expect(error.name).toBe("AbortError");
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+          } finally {
+            jest.useRealTimers();
+          }
+
+          // The refresh lock was released and the session kept, so the next
+          // refresh goes through.
+          const { scope: successScope } = nockRefresh({
+            accessTokenClaims: { jti: "refreshed-token" },
+          });
+          const accessToken = await client.getAccessToken();
+          expect(getClaims(accessToken).jti).toEqual("refreshed-token");
+          successScope.done();
+        });
       });
     });
 
