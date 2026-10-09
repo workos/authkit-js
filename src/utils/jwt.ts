@@ -1,14 +1,17 @@
 import { JWTHeader, JWTPayload } from "../interfaces/jwt.interface";
 
 /**
- * Decodes a base64url encoded string
+ * Decodes a base64url encoded UTF-8 string
  * @param input The base64url string to decode
- * @returns The decoded string
+ * @returns The decoded UTF-8 string
  */
 function decodeBase64Url(input: string): string {
   const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-  return atob(base64 + padding);
+  const binary = atob(base64 + padding);
+  return new TextDecoder().decode(
+    Uint8Array.from(binary, (c) => c.charCodeAt(0)),
+  );
 }
 
 /**

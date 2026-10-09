@@ -1,4 +1,13 @@
 import { decodeJwt } from "./jwt";
+import { getClaims } from "./session-data";
+
+function encodeSegment(value: object): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 describe("decodeJwt", () => {
   // Valid JWT token for testing (not a real token, just for testing purposes)
@@ -65,6 +74,29 @@ describe("decodeJwt", () => {
         "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJzaW5nbGUtYXVkaWVuY2UifQ.signature";
       const result = decodeJwt(singleAudToken);
       expect(result.payload.aud).toBe("single-audience");
+    });
+  });
+
+  describe("non-ASCII claims", () => {
+    it("should decode multi-byte UTF-8 claims", () => {
+      const token = `${encodeSegment({ alg: "HS256" })}.${encodeSegment({ org_name: "Acme Café" })}.signature`;
+      expect(decodeJwt<{ org_name: string }>(token).payload.org_name).toBe(
+        "Acme Café",
+      );
+      expect(getClaims<{ org_name: string }>(token).org_name).toBe("Acme Café");
+    });
+
+    it("should decode 4-byte UTF-8 claims", () => {
+      const token = `${encodeSegment({ alg: "HS256" })}.${encodeSegment({ status: "🚀 launch" })}.signature`;
+      expect(decodeJwt<{ status: string }>(token).payload.status).toBe(
+        "🚀 launch",
+      );
+      expect(getClaims<{ status: string }>(token).status).toBe("🚀 launch");
+    });
+
+    it("should decode non-ASCII header values", () => {
+      const token = `${encodeSegment({ alg: "HS256", kid: "clé-🔑" })}.${encodeSegment({ sub: "123" })}.signature`;
+      expect(decodeJwt(token).header.kid).toBe("clé-🔑");
     });
   });
 
