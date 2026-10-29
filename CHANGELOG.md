@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.5](https://github.com/workos/authkit-js/compare/v0.20.4...v0.20.5) (2026-10-09)
+
+
+### Bug Fixes
+
+* decode JWT claims as UTF-8 ([#145](https://github.com/workos/authkit-js/issues/145)) ([b797256](https://github.com/workos/authkit-js/commit/b797256c136ace9ae2ddda71c7c408049ac16b60))
+
 ## [0.20.4](https://github.com/workos/authkit-js/compare/v0.20.3...v0.20.4) (2026-09-29)
 
 
