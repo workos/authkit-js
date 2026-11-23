@@ -50,6 +50,11 @@ export class HttpClient {
   }) {
     const response = await this.#post("/user_management/authenticate", {
       useCookie,
+      createTimeoutError: (cause) =>
+        new RefreshError("Timed out refreshing the session.", {
+          cause,
+          isTransient: true,
+        }),
       body: {
         client_id: this.#clientId,
         grant_type: "refresh_token",
@@ -95,6 +100,10 @@ export class HttpClient {
   }) {
     const response = await this.#post("/user_management/authenticate", {
       useCookie,
+      createTimeoutError: (cause) =>
+        new CodeExchangeError("Timed out exchanging the authorization code.", {
+          cause,
+        }),
       body: {
         code,
         client_id: this.#clientId,
@@ -114,7 +123,15 @@ export class HttpClient {
 
   #post(
     path: "/user_management/authenticate",
-    { body, useCookie }: { body: Record<string, unknown>; useCookie: boolean },
+    {
+      body,
+      useCookie,
+      createTimeoutError,
+    }: {
+      body: Record<string, unknown>;
+      useCookie: boolean;
+      createTimeoutError: (cause: unknown) => Error;
+    },
   ) {
     return fetch(new URL(path, this.#baseUrl), {
       method: "POST",
@@ -125,6 +142,16 @@ export class HttpClient {
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(30_000),
+    }).catch((error: unknown) => {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        error.name === "TimeoutError"
+      ) {
+        throw createTimeoutError(error);
+      }
+      throw error;
     });
   }
 

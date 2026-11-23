@@ -1,4 +1,4 @@
-import { RefreshError } from "./errors";
+import { CodeExchangeError, RefreshError } from "./errors";
 import { HttpClient } from "./http-client";
 import nock from "nock";
 
@@ -18,9 +18,22 @@ describe("HttpClient", () => {
   describe("authenticateWithRefreshToken", () => {
     const refresh = () =>
       httpClient.authenticateWithRefreshToken({
-        refreshToken: "refresh_token",
+        refreshToken: "fake refresh token",
         useCookie: false,
       });
+
+    it("throws a transient RefreshError when the fetch times out", async () => {
+      const timeoutError = new DOMException(
+        "The operation timed out.",
+        "TimeoutError",
+      );
+      jest.spyOn(global, "fetch").mockRejectedValue(timeoutError);
+
+      const error = await refresh().catch((error) => error);
+      expect(error.constructor).toBe(RefreshError);
+      expect(error.isTransient).toBe(true);
+      expect(error.cause).toBe(timeoutError);
+    });
 
     it.each([
       ["a rate limit", 429, "too_many_requests"],
@@ -87,15 +100,32 @@ describe("HttpClient", () => {
       expect(error.isTransient).toBe(false);
     });
 
-    it("does not wrap a network failure in a RefreshError", async () => {
-      nock("https://api.workos.com")
-        .post("/user_management/authenticate")
-        .replyWithError(new TypeError("fetch failed"));
+    it("only wraps fetch rejections when the fetch times out", async () => {
+      const networkError = new TypeError("fetch failed");
+      jest.spyOn(global, "fetch").mockRejectedValue(networkError);
 
-      // A raw fetch failure propagates unchanged; create-client treats a
-      // non-RefreshError as transient and preserves the session.
-      const error = await refresh().catch((e) => e);
-      expect(error).not.toBeInstanceOf(RefreshError);
+      await expect(refresh()).rejects.toBe(networkError);
+    });
+  });
+
+  describe("authenticateWithCode", () => {
+    it("throws a CodeExchangeError when the fetch times out", async () => {
+      const timeoutError = new DOMException(
+        "The operation timed out.",
+        "TimeoutError",
+      );
+      jest.spyOn(global, "fetch").mockRejectedValue(timeoutError);
+
+      const error = await httpClient
+        .authenticateWithCode({
+          code: "fake authorization code",
+          codeVerifier: "fake code verifier",
+          useCookie: false,
+        })
+        .catch((error) => error);
+
+      expect(error).toBeInstanceOf(CodeExchangeError);
+      expect(error.cause).toBe(timeoutError);
     });
   });
 
