@@ -15,6 +15,25 @@ describe("HttpClient", () => {
     nock.cleanAll();
   });
 
+  function mockBodyTimeout(status: number, bodyErrorName: string) {
+    const timeoutError = new DOMException(
+      "The operation timed out.",
+      "TimeoutError",
+    );
+    const controller = new AbortController();
+    jest.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    const response = new Response(null, { status });
+    jest.spyOn(response, "json").mockImplementation(async () => {
+      controller.abort(timeoutError);
+      // Body readers can surface AbortError instead of the signal's reason.
+      throw bodyErrorName === "AbortError"
+        ? new DOMException("The operation was aborted.", "AbortError")
+        : timeoutError;
+    });
+    jest.spyOn(global, "fetch").mockResolvedValue(response);
+    return timeoutError;
+  }
+
   describe("authenticateWithRefreshToken", () => {
     const refresh = () =>
       httpClient.authenticateWithRefreshToken({
@@ -34,6 +53,21 @@ describe("HttpClient", () => {
       expect(error.isTransient).toBe(true);
       expect(error.cause).toBe(timeoutError);
     });
+
+    it.each([
+      [200, "AbortError"],
+      [401, "TimeoutError"],
+    ])(
+      "throws a transient RefreshError when the fetch times out reading a %i response body",
+      async (status, bodyErrorName) => {
+        const timeoutError = mockBodyTimeout(status, bodyErrorName);
+
+        const error = await refresh().catch((error) => error);
+        expect(error.constructor).toBe(RefreshError);
+        expect(error.isTransient).toBe(true);
+        expect(error.cause).toBe(timeoutError);
+      },
+    );
 
     it.each([
       ["a rate limit", 429, "too_many_requests"],
@@ -109,6 +143,13 @@ describe("HttpClient", () => {
   });
 
   describe("authenticateWithCode", () => {
+    const exchangeCode = () =>
+      httpClient.authenticateWithCode({
+        code: "fake authorization code",
+        codeVerifier: "fake code verifier",
+        useCookie: false,
+      });
+
     it("throws a CodeExchangeError when the fetch times out", async () => {
       const timeoutError = new DOMException(
         "The operation timed out.",
@@ -116,17 +157,24 @@ describe("HttpClient", () => {
       );
       jest.spyOn(global, "fetch").mockRejectedValue(timeoutError);
 
-      const error = await httpClient
-        .authenticateWithCode({
-          code: "fake authorization code",
-          codeVerifier: "fake code verifier",
-          useCookie: false,
-        })
-        .catch((error) => error);
-
+      const error = await exchangeCode().catch((error) => error);
       expect(error).toBeInstanceOf(CodeExchangeError);
       expect(error.cause).toBe(timeoutError);
     });
+
+    it.each([
+      [200, "TimeoutError"],
+      [400, "AbortError"],
+    ])(
+      "throws a CodeExchangeError when the fetch times out reading a %i response body",
+      async (status, bodyErrorName) => {
+        const timeoutError = mockBodyTimeout(status, bodyErrorName);
+
+        const error = await exchangeCode().catch((error) => error);
+        expect(error).toBeInstanceOf(CodeExchangeError);
+        expect(error.cause).toBe(timeoutError);
+      },
+    );
   });
 
   describe("getAuthorizationUrl", () => {
