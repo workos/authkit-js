@@ -230,6 +230,72 @@ describe("create-client", () => {
 
           nockScope.done();
         });
+
+        it("does not hang when the API is unreachable and the fetch times out", async () => {
+          jest.useFakeTimers();
+          try {
+            // Native AbortSignal.timeout uses an internal timer outside Jest's clock.
+            jest.spyOn(AbortSignal, "timeout").mockImplementation((ms) => {
+              const controller = new AbortController();
+              setTimeout(() => {
+                controller.abort(
+                  new DOMException("The operation timed out.", "TimeoutError"),
+                );
+              }, ms);
+              return controller.signal;
+            });
+            Object.defineProperty(navigator, "locks", {
+              configurable: true,
+              value: {
+                request: (
+                  _name: string,
+                  _options: LockOptions,
+                  callback: () => unknown,
+                ) => callback(),
+              },
+            });
+            const mockFetch = jest.spyOn(global, "fetch").mockImplementation(
+              (_url, init) =>
+                new Promise((_resolve, reject) => {
+                  const signal = init?.signal;
+                  signal?.addEventListener(
+                    "abort",
+                    () => reject(signal.reason),
+                    {
+                      once: true,
+                    },
+                  );
+                }),
+            );
+            const initialized = jest.fn();
+            const initializing = createClient("client_123abc", {
+              devMode: false,
+              redirectUri: "https://example.com/",
+            }).then((result) => {
+              client = result;
+              initialized();
+              return result;
+            });
+
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+            const signal = mockFetch.mock.calls[0][1]?.signal;
+            expect(signal).toBeDefined();
+            await jest.advanceTimersByTimeAsync(29_999);
+            expect(signal?.aborted).toBe(false);
+            expect(initialized).not.toHaveBeenCalled();
+
+            await jest.advanceTimersByTimeAsync(1);
+            expect(signal?.aborted).toBe(true);
+            expect(signal?.reason).toMatchObject({ name: "TimeoutError" });
+            expect(initialized).toHaveBeenCalledTimes(1);
+            await expect(initializing).resolves.toBeDefined();
+            expect(client.getUser()).toBeNull();
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+          } finally {
+            client?.dispose();
+            jest.useRealTimers();
+          }
+        });
       });
 
       describe("when devMode is true", () => {

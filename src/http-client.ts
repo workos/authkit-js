@@ -18,6 +18,15 @@ interface AuthenticationErrorResponse {
   error_description?: string;
 }
 
+function hasErrorName(error: unknown, name: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === name
+  );
+}
+
 export class HttpClient {
   readonly #baseUrl: string;
   readonly #clientId: string;
@@ -48,40 +57,37 @@ export class HttpClient {
     organizationId?: string;
     useCookie: boolean;
   }) {
-    const response = await this.#post("/user_management/authenticate", {
-      useCookie,
-      body: {
-        client_id: this.#clientId,
-        grant_type: "refresh_token",
-        ...(!useCookie && { refresh_token: refreshToken }),
-        organization_id: organizationId,
+    const { ok, status, data } = await this.#post(
+      "/user_management/authenticate",
+      {
+        useCookie,
+        allowNonJsonErrorBody: true,
+        createTimeoutError: (cause) =>
+          new RefreshError("Timed out refreshing the session.", {
+            cause,
+            isTransient: true,
+          }),
+        body: {
+          client_id: this.#clientId,
+          grant_type: "refresh_token",
+          ...(!useCookie && { refresh_token: refreshToken }),
+          organization_id: organizationId,
+        },
       },
-    });
+    );
 
-    if (response.ok) {
-      const data = (await response.json()) as AuthenticationResponseRaw;
-      return deserializeAuthenticationResponse(data);
+    if (ok) {
+      return deserializeAuthenticationResponse(
+        data as AuthenticationResponseRaw,
+      );
     }
 
-    const { status } = response;
-    const body = await this.#parseErrorBody(response);
+    const body = data as AuthenticationErrorResponse;
     throw new RefreshError(body.error_description, {
       status,
       error: body.error,
       isTransient: RETRYABLE_REFRESH_STATUS_CODES.has(status),
     });
-  }
-
-  async #parseErrorBody(
-    response: Response,
-  ): Promise<AuthenticationErrorResponse> {
-    try {
-      return (await response.json()) as AuthenticationErrorResponse;
-    } catch {
-      // A 5xx (or gateway) response may carry a non-JSON body; treat it as an
-      // empty error payload so the status still drives classification.
-      return {};
-    }
   }
 
   async authenticateWithCode({
@@ -93,8 +99,12 @@ export class HttpClient {
     codeVerifier: string;
     useCookie: boolean;
   }) {
-    const response = await this.#post("/user_management/authenticate", {
+    const { ok, data } = await this.#post("/user_management/authenticate", {
       useCookie,
+      createTimeoutError: (cause) =>
+        new CodeExchangeError("Timed out exchanging the authorization code.", {
+          cause,
+        }),
       body: {
         code,
         client_id: this.#clientId,
@@ -103,28 +113,59 @@ export class HttpClient {
       },
     });
 
-    if (response.ok) {
-      const data = (await response.json()) as AuthenticationResponseRaw;
-      return deserializeAuthenticationResponse(data);
+    if (ok) {
+      return deserializeAuthenticationResponse(
+        data as AuthenticationResponseRaw,
+      );
     }
 
-    const error = await response.json();
+    const error = data as AuthenticationErrorResponse;
     throw new CodeExchangeError(error.error_description);
   }
 
-  #post(
+  async #post(
     path: "/user_management/authenticate",
-    { body, useCookie }: { body: Record<string, unknown>; useCookie: boolean },
+    {
+      body,
+      useCookie,
+      createTimeoutError,
+      allowNonJsonErrorBody = false,
+    }: {
+      body: Record<string, unknown>;
+      useCookie: boolean;
+      createTimeoutError: (cause: unknown) => Error;
+      allowNonJsonErrorBody?: boolean;
+    },
   ) {
-    return fetch(new URL(path, this.#baseUrl), {
-      method: "POST",
-      ...(useCookie && { credentials: "include" }),
-      headers: {
-        Accept: "application/json, text/plain, */*",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const signal = AbortSignal.timeout(30_000);
+    let response: Response | undefined;
+    try {
+      response = await fetch(new URL(path, this.#baseUrl), {
+        method: "POST",
+        ...(useCookie && { credentials: "include" }),
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal,
+      });
+      const data: unknown = await response.json();
+      return { ok: response.ok, status: response.status, data };
+    } catch (error) {
+      // A body read can reject with AbortError rather than the timeout reason.
+      const cause: unknown = hasErrorName(error, "AbortError")
+        ? signal.reason
+        : error;
+      if (hasErrorName(cause, "TimeoutError")) {
+        throw createTimeoutError(cause);
+      }
+      if (allowNonJsonErrorBody && response && !response.ok) {
+        // Keep classifying non-JSON refresh errors by HTTP status.
+        return { ok: false, status: response.status, data: {} };
+      }
+      throw error;
+    }
   }
 
   getAuthorizationUrl({
